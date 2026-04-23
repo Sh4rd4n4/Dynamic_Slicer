@@ -1,0 +1,21 @@
+{
+  "name": "dynamic-slicer",
+  "version": "0.1.4.1",
+  "private": true,
+  "description": "Power BI custom visual scaffold for reverse engineering a preselected slicer visual.",
+  "scripts": {
+    "start": "pbiviz start",
+    "package": "pbiviz package",
+    "package:node24": "pbiviz package --skip-api",
+    "preview:style": "node tools/style-preview-server.js",
+    "validate": "pbiviz package --resources --no-minify"
+  },
+  "dependencies": {
+    "powerbi-visuals-api": "~5.3.0",
+    "powerbi-visuals-utils-formattingmodel": "^6.2.2"
+  },
+  "devDependencies": {
+    "powerbi-visuals-tools": "^7.0.3",
+    "typescript": "^5.4.5"
+  }
+}

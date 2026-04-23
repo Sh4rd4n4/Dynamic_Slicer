@@ -1,0 +1,85 @@
+{
+  "privileges": [],
+  "dataRoles": [
+    {
+      "name": "category",
+      "kind": "Grouping",
+      "displayName": "Category"
+    }
+  ],
+  "dataViewMappings": [
+    {
+      "categorical": {
+        "categories": {
+          "for": {
+            "in": "category"
+          },
+          "dataReductionAlgorithm": {
+            "top": {
+              "count": 10000
+            }
+          }
+        }
+      }
+    }
+  ],
+  "supportsKeyboardFocus": true,
+  "supportsEmptyDataView": true,
+  "objects": {
+    "general": {
+      "displayName": "General",
+      "properties": {
+        "filter": {
+          "type": {
+            "filter": true
+          }
+        }
+      }
+    },
+    "slicer": {
+      "displayName": "Slicer",
+      "properties": {
+        "displayMode": {
+          "displayName": "Style",
+          "type": {
+            "enumeration": [
+              {
+                "displayName": "Dropdown",
+                "value": "dropdown"
+              },
+              {
+                "displayName": "List",
+                "value": "list"
+              }
+            ]
+          }
+        },
+        "showTitle": {
+          "displayName": "Show title",
+          "type": {
+            "bool": true
+          }
+        },
+        "titleText": {
+          "displayName": "Title text",
+          "type": {
+            "text": true
+          }
+        }
+      }
+    }
+  },
+  "supportsHighlight": false,
+  "supportsSynchronizingFilterState": true,
+  "tooltips": {
+    "supportedTypes": {
+      "default": true
+    }
+  },
+  "sorting": {
+    "default": {}
+  },
+  "drilldown": {
+    "roles": []
+  }
+}

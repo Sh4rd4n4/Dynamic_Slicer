@@ -1,0 +1,148 @@
+.dynamic-slicer {
+    font-family: "Segoe UI", sans-serif;
+    box-sizing: border-box;
+    color: #252423;
+    height: 100%;
+    padding: 8px 10px 10px;
+    position: relative;
+    width: 100%;
+}
+
+.dynamic-slicer__control {
+    height: 100%;
+    padding-right: 20px;
+}
+
+.dynamic-slicer__title {
+    display: block;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 18px;
+    margin-bottom: 3px;
+}
+
+.dynamic-slicer__select-wrapper {
+    position: relative;
+    margin-top: 3px;
+}
+
+.dynamic-slicer__select-wrapper::after {
+    border-color: #605e5c transparent transparent;
+    border-style: solid;
+    border-width: 5px 4px 0;
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.dynamic-slicer__select {
+    -moz-appearance: none;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #ffffff;
+    border: 1px solid #e1dfdd;
+    border-radius: 0;
+    box-sizing: border-box;
+    color: #605e5c;
+    display: block;
+    font-family: "Segoe UI", sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    height: 28px;
+    line-height: 20px;
+    margin: 0;
+    min-width: 0;
+    outline: none;
+    padding: 3px 28px 3px 8px;
+    width: 100%;
+}
+
+.dynamic-slicer__select:hover {
+    border-color: #605e5c;
+}
+
+.dynamic-slicer__select:focus {
+    border-color: #605e5c;
+}
+
+.dynamic-slicer__clear {
+    background: transparent;
+    border: 0;
+    color: #605e5c;
+    cursor: pointer;
+    height: 22px;
+    padding: 0;
+    position: absolute;
+    right: 6px;
+    top: 5px;
+    width: 22px;
+}
+
+.dynamic-slicer__clear::before {
+    content: "";
+    display: block;
+    height: 16px;
+    margin: 3px;
+    width: 16px;
+    background-color: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6.4 1.6 14.4 9.6 10 14H4.1L1.6 11.5 8.5 4.6 6.4 2.5V1.6ZM9.2 5.3 3 11.5 4.5 13H9.6L13 9.6 9.2 5.3Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6.4 1.6 14.4 9.6 10 14H4.1L1.6 11.5 8.5 4.6 6.4 2.5V1.6ZM9.2 5.3 3 11.5 4.5 13H9.6L13 9.6 9.2 5.3Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.dynamic-slicer__clear:hover:not(:disabled) {
+    color: #252423;
+}
+
+.dynamic-slicer__clear:disabled {
+    color: #c8c6c4;
+    cursor: default;
+}
+
+.dynamic-slicer__list {
+    border: 1px solid #e1dfdd;
+    box-sizing: border-box;
+    max-height: calc(100% - 21px);
+    min-height: 28px;
+    overflow-y: auto;
+    width: 100%;
+}
+
+.dynamic-slicer__list-item {
+    background: #ffffff;
+    border: 0;
+    box-sizing: border-box;
+    color: #252423;
+    cursor: pointer;
+    display: block;
+    font-family: "Segoe UI", sans-serif;
+    font-size: 13px;
+    height: 26px;
+    line-height: 20px;
+    overflow: hidden;
+    padding: 3px 8px;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+}
+
+.dynamic-slicer__list-item:hover {
+    background: #f3f2f1;
+}
+
+.dynamic-slicer__list-item--selected {
+    background: #e5f1fb;
+    color: #201f1e;
+    font-weight: 600;
+}
+
+.dynamic-slicer__empty {
+    border: 1px dashed #9ca3af;
+    border-radius: 8px;
+    padding: 16px;
+    color: #4b5563;
+    background: #f9fafb;
+}
