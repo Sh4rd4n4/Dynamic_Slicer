@@ -14,25 +14,30 @@
   ],
   "dataViewMappings": [
     {
-      "categorical": {
-        "categories": {
-          "for": {
-            "in": "field"
+      "conditions": [
+        {
+          "field": {
+            "max": 1
           },
-          "dataReductionAlgorithm": {
-            "top": {
-              "count": 10000
-            }
+          "dynamicSelection": {
+            "max": 1
           }
         }
-      }
-    }, 
-    {
+      ],
       "categorical": {
         "categories": {
-          "for": {
-            "in": "dynamicSelection"
-          },
+          "select": [
+            {
+              "for": {
+                "in": "field"
+              }
+            },
+            {
+              "for": {
+                "in": "dynamicSelection"
+              }
+            }
+          ],
           "dataReductionAlgorithm": {
             "top": {
               "count": 10000

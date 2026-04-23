@@ -40,8 +40,7 @@ interface VisualViewModel {
 
 type DisplayMode = "dropdown" | "list";
 
-const basicFilterSchema = ["ht", "tp://powerbi.com/product/schema#basic"].join("");
-
+const basicFilterSchema = ["ht", "tp://powerbi.com/product/schema#basic"].join(""); // Avoids lint issue with "http"
 export class Visual implements IVisual {
     private readonly root: HTMLDivElement;
     private readonly formattingSettingsService: FormattingSettingsService;
@@ -66,6 +65,8 @@ export class Visual implements IVisual {
 
     public update(options: VisualUpdateOptions): void {
         const dataView = options.dataViews?.[0];
+
+        // Makes the dataview for the vidsual from power bi raw datamodel 
         const viewModel = this.getViewModel(dataView, options.jsonFilters);
         this.fieldColumn = viewModel.fieldColumn;
         this.dynamicSelectionColumn = viewModel.dynamicSelectionColumn;
@@ -185,6 +186,8 @@ export class Visual implements IVisual {
     }
 
     private handleIndexedSelection(index: string, items: SlicerItem[]): void {
+        // In dropdown mode the empty option means "All", so clearing the filter
+        // is the equivalent of selecting no specific value.
         if (index === "") {
             this.clearFilter();
             return;
@@ -198,6 +201,8 @@ export class Visual implements IVisual {
     }
 
     private getViewModel(dataView?: DataView, jsonFilters?: powerbi.IFilter[]): VisualViewModel {
+        // Resolve columns by role name instead of position so the code stays in
+        // sync with capabilities.json even if more roles are added later.
         const fieldColumn = this.getCategoryColumnByRole(dataView, "field");
         const dynamicSelectionColumn = this.getCategoryColumnByRole(dataView, "dynamicSelection");
         const selectedValue = this.getSelectedValue(fieldColumn, jsonFilters);
@@ -217,6 +222,7 @@ export class Visual implements IVisual {
     }
 
     private applyFilter(value: powerbi.PrimitiveValue): void {
+        // Power BI expects a JSON filter object that targets the bound field.
         const target = this.getFilterTarget();
 
         if (!target) {
@@ -235,6 +241,7 @@ export class Visual implements IVisual {
     }
 
     private clearFilter(): void {
+        // Removing the filter is how the visual returns to the "All" state.
         this.host.applyJsonFilter(null as unknown as powerbi.IFilter, "general", "filter", FilterAction.remove);
     }
 
@@ -261,6 +268,8 @@ export class Visual implements IVisual {
         fieldColumn?: DataViewCategoryColumn,
         jsonFilters?: powerbi.IFilter[]
     ): powerbi.PrimitiveValue | undefined {
+        // Power BI sends existing filter state back through jsonFilters, so this
+        // method restores which item is currently selected when the visual rerenders.
         const target = this.getFilterTargetFromColumn(fieldColumn);
 
         if (!target || !jsonFilters) {
@@ -325,6 +334,7 @@ export class Visual implements IVisual {
     private getCategoryColumnByRole(dataView: DataView | undefined, roleName: string): DataViewCategoryColumn | undefined {
         const categories = dataView?.categorical?.categories;
 
+        // Role matching is based on capabilities.json dataRoles names.
         return categories?.find((category) => this.hasRole(category, roleName));
     }
 

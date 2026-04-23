@@ -4,9 +4,10 @@
     "displayName": "Dynamic Slicer",
     "guid": "DynamicSlicerE5B9D8D0C4D449A18B87A3C4F55A001",
     "visualClassName": "Visual",
-    "version": "0.1.4.2",
+    "version": "0.1.5.0",
     "description": "Experimental custom visual used to allow dynamic default selection in slicer",
-    "gitHubUrl": "https://example.com/repo"
+    "supportUrl": "https://github.com/Sh4rd4n4/Dynamic_Slicer/issues",
+    "gitHubUrl": "https://github.com/Sh4rd4n4/Dynamic_Slicer"
   },
   "apiVersion": "5.3.0",
   "author": {
