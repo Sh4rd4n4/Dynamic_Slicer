@@ -11,5 +11,6 @@
     "lib": ["DOM", "ES2020"],
     "types": []
   },
+  "files": ["src/visual.ts", "src/settings.ts"],
   "include": ["src/**/*.ts", "src/**/*.d.ts"]
 }

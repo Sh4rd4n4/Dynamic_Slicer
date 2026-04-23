@@ -2,9 +2,14 @@
   "privileges": [],
   "dataRoles": [
     {
-      "name": "category",
+      "name": "field",
       "kind": "Grouping",
-      "displayName": "Category"
+      "displayName": "Field"
+    }, 
+    {
+      "name": "dynamicSelection",
+      "kind": "Grouping",
+      "displayName": "Dynamic Selection"
     }
   ],
   "dataViewMappings": [
@@ -12,7 +17,21 @@
       "categorical": {
         "categories": {
           "for": {
-            "in": "category"
+            "in": "field"
+          },
+          "dataReductionAlgorithm": {
+            "top": {
+              "count": 10000
+            }
+          }
+        }
+      }
+    }, 
+    {
+      "categorical": {
+        "categories": {
+          "for": {
+            "in": "dynamicSelection"
           },
           "dataReductionAlgorithm": {
             "top": {

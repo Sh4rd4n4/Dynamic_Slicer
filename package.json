@@ -1,8 +1,8 @@
 {
   "name": "dynamic-slicer",
-  "version": "0.1.4.1",
+  "version": "0.1.4.2",
   "private": true,
-  "description": "Power BI custom visual scaffold for reverse engineering a preselected slicer visual.",
+  "description": "Experimental custom visual used to allow dynamic default selection in slicer",
   "scripts": {
     "start": "pbiviz start",
     "package": "pbiviz package",

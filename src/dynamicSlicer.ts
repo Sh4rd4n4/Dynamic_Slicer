@@ -30,6 +30,14 @@ interface SlicerItem {
     selected: boolean;
 }
 
+interface VisualViewModel {
+    fieldColumn?: DataViewCategoryColumn;
+    dynamicSelectionColumn?: DataViewCategoryColumn;
+    dynamicSelectionValues: string[];
+    items: SlicerItem[];
+    selectedValue?: powerbi.PrimitiveValue;
+}
+
 type DisplayMode = "dropdown" | "list";
 
 const basicFilterSchema = ["ht", "tp://powerbi.com/product/schema#basic"].join("");
@@ -39,7 +47,8 @@ export class Visual implements IVisual {
     private readonly formattingSettingsService: FormattingSettingsService;
     private readonly host: IVisualHost;
     private formattingSettings: VisualFormattingSettingsModel;
-    private categoryColumn?: DataViewCategoryColumn;
+    private fieldColumn?: DataViewCategoryColumn;
+    private dynamicSelectionColumn?: DataViewCategoryColumn;
     private selectedValue?: powerbi.PrimitiveValue;
 
     constructor(options?: VisualConstructorOptions) {
@@ -57,21 +66,23 @@ export class Visual implements IVisual {
 
     public update(options: VisualUpdateOptions): void {
         const dataView = options.dataViews?.[0];
-        this.categoryColumn = dataView?.categorical?.categories?.[0];
-        const items = this.getSlicerItems(dataView, options.jsonFilters);
+        const viewModel = this.getViewModel(dataView, options.jsonFilters);
+        this.fieldColumn = viewModel.fieldColumn;
+        this.dynamicSelectionColumn = viewModel.dynamicSelectionColumn;
+        this.selectedValue = viewModel.selectedValue;
         this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
             VisualFormattingSettingsModel,
             dataView
         );
         this.clearElement(this.root);
 
-        if (items.length === 0) {
+        if (viewModel.items.length === 0) {
             const emptyState = document.createElement("div");
             emptyState.className = "dynamic-slicer__empty";
             emptyState.append("Bind a field to ");
 
             const strong = document.createElement("strong");
-            strong.textContent = "Category";
+            strong.textContent = "Field";
             emptyState.appendChild(strong);
             emptyState.append(" to start inspecting slicer behavior.");
 
@@ -90,9 +101,9 @@ export class Visual implements IVisual {
         }
 
         if (this.getDisplayMode() === "list") {
-            control.appendChild(this.createList(items));
+            control.appendChild(this.createList(viewModel.items));
         } else {
-            control.appendChild(this.createDropdown(items));
+            control.appendChild(this.createDropdown(viewModel.items));
         }
 
         const clearButton = document.createElement("button");
@@ -186,16 +197,23 @@ export class Visual implements IVisual {
         }
     }
 
-    private getSlicerItems(dataView?: DataView, jsonFilters?: powerbi.IFilter[]): SlicerItem[] {
-        const categoryColumn = dataView?.categorical?.categories?.[0];
-        const values = categoryColumn?.values ?? [];
-        this.selectedValue = this.getSelectedValue(jsonFilters);
+    private getViewModel(dataView?: DataView, jsonFilters?: powerbi.IFilter[]): VisualViewModel {
+        const fieldColumn = this.getCategoryColumnByRole(dataView, "field");
+        const dynamicSelectionColumn = this.getCategoryColumnByRole(dataView, "dynamicSelection");
+        const selectedValue = this.getSelectedValue(fieldColumn, jsonFilters);
+        const values = fieldColumn?.values ?? [];
 
-        return values.map((value) => ({
-            value,
-            label: String(value),
-            selected: this.areValuesEqual(value, this.selectedValue)
-        }));
+        return {
+            fieldColumn,
+            dynamicSelectionColumn,
+            dynamicSelectionValues: this.getColumnValues(dynamicSelectionColumn),
+            items: values.map((value) => ({
+                value,
+                label: String(value),
+                selected: this.areValuesEqual(value, selectedValue)
+            })),
+            selectedValue
+        };
     }
 
     private applyFilter(value: powerbi.PrimitiveValue): void {
@@ -221,7 +239,7 @@ export class Visual implements IVisual {
     }
 
     private getFilterTarget(): BasicFilter["target"] | undefined {
-        const queryName = this.categoryColumn?.source.queryName;
+        const queryName = this.fieldColumn?.source.queryName;
 
         if (!queryName) {
             return undefined;
@@ -239,8 +257,11 @@ export class Visual implements IVisual {
         };
     }
 
-    private getSelectedValue(jsonFilters?: powerbi.IFilter[]): powerbi.PrimitiveValue | undefined {
-        const target = this.getFilterTarget();
+    private getSelectedValue(
+        fieldColumn?: DataViewCategoryColumn,
+        jsonFilters?: powerbi.IFilter[]
+    ): powerbi.PrimitiveValue | undefined {
+        const target = this.getFilterTargetFromColumn(fieldColumn);
 
         if (!target || !jsonFilters) {
             return undefined;
@@ -257,6 +278,25 @@ export class Visual implements IVisual {
         }) as BasicFilter | undefined;
 
         return matchingFilter?.values[0];
+    }
+
+    private getFilterTargetFromColumn(fieldColumn?: DataViewCategoryColumn): BasicFilter["target"] | undefined {
+        const queryName = fieldColumn?.source.queryName;
+
+        if (!queryName) {
+            return undefined;
+        }
+
+        const separatorIndex = queryName.lastIndexOf(".");
+
+        if (separatorIndex < 1 || separatorIndex === queryName.length - 1) {
+            return undefined;
+        }
+
+        return {
+            table: queryName.slice(0, separatorIndex),
+            column: queryName.slice(separatorIndex + 1)
+        };
     }
 
     private areValuesEqual(first: powerbi.PrimitiveValue, second?: powerbi.PrimitiveValue): boolean {
@@ -279,7 +319,21 @@ export class Visual implements IVisual {
     private getTitleText(): string {
         const customTitle = this.formattingSettings.slicerCard.titleText.value.trim();
 
-        return customTitle || this.categoryColumn?.source.displayName || "Category";
+        return customTitle || this.fieldColumn?.source.displayName || "Field";
+    }
+
+    private getCategoryColumnByRole(dataView: DataView | undefined, roleName: string): DataViewCategoryColumn | undefined {
+        const categories = dataView?.categorical?.categories;
+
+        return categories?.find((category) => this.hasRole(category, roleName));
+    }
+
+    private hasRole(categoryColumn: DataViewCategoryColumn | undefined, roleName: string): boolean {
+        return Boolean(categoryColumn?.source.roles?.[roleName]);
+    }
+
+    private getColumnValues(column?: DataViewCategoryColumn): string[] {
+        return (column?.values ?? []).map((value) => String(value));
     }
 
     private clearElement(element: HTMLElement): void {
