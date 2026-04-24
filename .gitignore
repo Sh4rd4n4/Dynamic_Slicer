@@ -7,3 +7,4 @@ nodejs/
 data/
 webpack.statistics.prod.html
 tools/
+.vscode/
