@@ -1,10 +1,8 @@
 # Dynamic Slicer
 
-A slicer that can change its default value based on RLS filtering
+A slicer that can change its default value based on RLS filtering.
 
 ## Local setup
-
-This repo works with the current Node version in this environment, but `pbiviz` needs a small workaround when packaging.
 
 1. Install project dependencies:
    `npm install`
@@ -14,13 +12,18 @@ This repo works with the current Node version in this environment, but `pbiviz` 
 
 Notes:
 
-- `pbiviz` may still print certificate or webpack logger errors on Node 24 after the package is created.
-- If `dist/*.pbiviz` exists, treat that as the real success signal.
-- The regular `npm run package` command is kept for compatibility, but `npm run package:node24` is the reliable one in this repo.
+- `pbiviz` may still print certificate or webpack logger errors on Node 24 after the package is created, but the built visual still works
+- The regular `npm run package` command is kept for compatibility, but use `npm run package:node24`
 
 ## Current Status
 
-As of version 1.6.2+ the visual can dynamically adjust its default value, more features are being implemented (currentyear, better fallback logic and so on...)
+As of version 1.6.2+ the visual can dynamically adjust its default value, this is a first implementation and it's missing many features
+
+## Next steps
+
+- more formatting options (upcoming, essential for most use cases)
+- option to utomatically filter on currentyear
+- more flexible fallback logic
 
 ## How to use the visual
 
