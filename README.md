@@ -1,18 +1,6 @@
 # Dynamic Slicer
 
-The goal of this project is to build a slicer for Power BI that allows for dynamic default values instead of fixed ones
-
-## Use cases ##
-
-- Dynamically set the current year as default without DAX tricks, and then optionallly change years
-- Allow different users to see different default values on the filters based on RDL or tables/measures 
-
-## Base Content
-
-- Minimal Power BI custom visual scaffold
-- TypeScript source for a basic slicer-like placeholder visual
-- Packaging metadata for `pbiviz`
-- Toolchain reference in `VERSIONS.md`
+A slicer that can change its default value based on RLS filtering
 
 ## Local setup
 
