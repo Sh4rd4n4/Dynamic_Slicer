@@ -12,6 +12,7 @@ import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructor
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 
 import { VisualFormattingSettingsModel } from "./settings";
+import { resolveDynamicSelection } from "./dynamicSelection";
 
 interface BasicFilter extends powerbi.IFilter {
     $schema: string;
@@ -32,13 +33,19 @@ interface SlicerItem {
 
 interface VisualViewModel {
     fieldColumn?: DataViewCategoryColumn;
-    dynamicSelectionColumn?: DataViewCategoryColumn;
     dynamicSelectionValues: string[];
     items: SlicerItem[];
     selectedValue?: powerbi.PrimitiveValue;
 }
 
 type DisplayMode = "dropdown" | "list";
+const isDebugPanelEnabled = false;
+
+interface DebugState {
+    autoSelectedValue?: powerbi.PrimitiveValue;
+    jsonFilters?: powerbi.IFilter[];
+    viewModel: VisualViewModel;
+}
 
 const basicFilterSchema = ["ht", "tp://powerbi.com/product/schema#basic"].join(""); // Avoids lint issue with "http"
 export class Visual implements IVisual {
@@ -47,8 +54,10 @@ export class Visual implements IVisual {
     private readonly host: IVisualHost;
     private formattingSettings: VisualFormattingSettingsModel;
     private fieldColumn?: DataViewCategoryColumn;
-    private dynamicSelectionColumn?: DataViewCategoryColumn;
     private selectedValue?: powerbi.PrimitiveValue;
+    private hasUserInteracted: boolean;
+    private filterTargetKey?: string;
+    private preferredSelectionKey?: string;
 
     constructor(options?: VisualConstructorOptions) {
         if (!options) {
@@ -58,6 +67,7 @@ export class Visual implements IVisual {
         this.formattingSettingsService = new FormattingSettingsService();
         this.formattingSettings = new VisualFormattingSettingsModel();
         this.host = options.host;
+        this.hasUserInteracted = false;
         this.root = document.createElement("div");
         this.root.className = "dynamic-slicer";
         options.element.appendChild(this.root);
@@ -68,16 +78,33 @@ export class Visual implements IVisual {
 
         // Makes the dataview for the vidsual from power bi raw datamodel 
         const viewModel = this.getViewModel(dataView, options.jsonFilters);
+        this.syncInteractionState(viewModel.fieldColumn, viewModel.dynamicSelectionValues[0]);
+        const autoSelectedValue = this.resolveAutoSelectedValue(viewModel);
+        const renderedItems = this.getRenderedItems(viewModel.items, autoSelectedValue ?? viewModel.selectedValue);
         this.fieldColumn = viewModel.fieldColumn;
-        this.dynamicSelectionColumn = viewModel.dynamicSelectionColumn;
-        this.selectedValue = viewModel.selectedValue;
+        this.selectedValue = autoSelectedValue ?? viewModel.selectedValue;
         this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
             VisualFormattingSettingsModel,
             dataView
         );
         this.clearElement(this.root);
 
-        if (viewModel.items.length === 0) {
+        if (isDebugPanelEnabled) {
+            this.root.appendChild(this.createDebugPanel({
+                autoSelectedValue,
+                jsonFilters: options.jsonFilters,
+                viewModel
+            }));
+        }
+
+        if (
+            autoSelectedValue !== undefined
+            && !this.areValuesEqual(autoSelectedValue, viewModel.selectedValue)
+        ) {
+            this.applyFilter(autoSelectedValue, false);
+        }
+
+        if (renderedItems.length === 0) {
             const emptyState = document.createElement("div");
             emptyState.className = "dynamic-slicer__empty";
             emptyState.append("Bind a field to ");
@@ -102,9 +129,9 @@ export class Visual implements IVisual {
         }
 
         if (this.getDisplayMode() === "list") {
-            control.appendChild(this.createList(viewModel.items));
+            control.appendChild(this.createList(renderedItems));
         } else {
-            control.appendChild(this.createDropdown(viewModel.items));
+            control.appendChild(this.createDropdown(renderedItems));
         }
 
         const clearButton = document.createElement("button");
@@ -113,7 +140,7 @@ export class Visual implements IVisual {
         clearButton.title = "Clear selections";
         clearButton.setAttribute("aria-label", "Clear selections");
         clearButton.disabled = this.selectedValue === undefined;
-        clearButton.addEventListener("click", () => this.clearFilter());
+        clearButton.addEventListener("click", () => this.clearFilter(true));
 
         this.root.appendChild(control);
         this.root.appendChild(clearButton);
@@ -158,14 +185,14 @@ export class Visual implements IVisual {
         list.setAttribute("role", "listbox");
         list.setAttribute("aria-label", this.getTitleText());
 
-        const allButton = this.createListButton("All", this.selectedValue === undefined, () => this.clearFilter());
+        const allButton = this.createListButton("All", this.selectedValue === undefined, () => this.clearFilter(true));
         list.appendChild(allButton);
 
         items.forEach((slicerItem) => {
             list.appendChild(this.createListButton(
                 slicerItem.label,
                 slicerItem.selected,
-                () => this.applyFilter(slicerItem.value)
+                () => this.applyFilter(slicerItem.value, true)
             ));
         });
 
@@ -185,18 +212,59 @@ export class Visual implements IVisual {
         return button;
     }
 
+    private createDebugPanel(debugState: DebugState): HTMLElement {
+        const panel = document.createElement("details");
+        panel.className = "dynamic-slicer__debug";
+        panel.open = true;
+
+        const summary = document.createElement("summary");
+        summary.textContent = "Debug";
+        panel.appendChild(summary);
+
+        const pre = document.createElement("pre");
+        pre.textContent = JSON.stringify(this.getDebugPayload(debugState), null, 2);
+        panel.appendChild(pre);
+
+        return panel;
+    }
+
+    private getDebugPayload(debugState: DebugState): Record<string, unknown> {
+        const fieldColumn = debugState.viewModel.fieldColumn;
+
+        return {
+            field: {
+                displayName: fieldColumn?.source.displayName,
+                queryName: fieldColumn?.source.queryName,
+                filterTarget: this.getFilterTargetFromColumn(fieldColumn),
+                valuesReceived: debugState.viewModel.items.map((item) => item.label)
+            },
+            dynamicSelection: {
+                valuesReceived: debugState.viewModel.dynamicSelectionValues,
+                firstPreferredValue: debugState.viewModel.dynamicSelectionValues[0]
+            },
+            filterState: {
+                selectedValueFromJsonFilters: this.stringifyPrimitive(debugState.viewModel.selectedValue),
+                autoSelectedValue: this.stringifyPrimitive(debugState.autoSelectedValue),
+                hasUserInteracted: this.hasUserInteracted,
+                filterTargetKey: this.filterTargetKey,
+                preferredSelectionKey: this.preferredSelectionKey
+            },
+            jsonFilters: debugState.jsonFilters ?? []
+        };
+    }
+
     private handleIndexedSelection(index: string, items: SlicerItem[]): void {
         // In dropdown mode the empty option means "All", so clearing the filter
         // is the equivalent of selecting no specific value.
         if (index === "") {
-            this.clearFilter();
+            this.clearFilter(true);
             return;
         }
 
         const item = items[Number(index)];
 
         if (item) {
-            this.applyFilter(item.value);
+            this.applyFilter(item.value, true);
         }
     }
 
@@ -206,27 +274,63 @@ export class Visual implements IVisual {
         const fieldColumn = this.getCategoryColumnByRole(dataView, "field");
         const dynamicSelectionColumn = this.getCategoryColumnByRole(dataView, "dynamicSelection");
         const selectedValue = this.getSelectedValue(fieldColumn, jsonFilters);
-        const values = fieldColumn?.values ?? [];
+        const items = this.getDistinctItems(fieldColumn?.values ?? [], selectedValue);
 
         return {
             fieldColumn,
-            dynamicSelectionColumn,
             dynamicSelectionValues: this.getColumnValues(dynamicSelectionColumn),
-            items: values.map((value) => ({
-                value,
-                label: String(value),
-                selected: this.areValuesEqual(value, selectedValue)
-            })),
+            items,
             selectedValue
         };
     }
 
-    private applyFilter(value: powerbi.PrimitiveValue): void {
+    private resolveAutoSelectedValue(viewModel: VisualViewModel): powerbi.PrimitiveValue | undefined {
+        if (this.hasUserInteracted) {
+            return undefined;
+        }
+
+        const preferredValue = viewModel.dynamicSelectionValues[0];
+
+        if (!preferredValue) {
+            return undefined;
+        }
+
+        const autoSelectedValue = resolveDynamicSelection({
+            visibleValues: viewModel.items.map((item) => item.value),
+            selectedValue: undefined,
+            strategy: "preferredValue",
+            preferredValue
+        });
+
+        if (autoSelectedValue === undefined) {
+            return undefined;
+        }
+
+        return this.areValuesEqual(autoSelectedValue, viewModel.selectedValue)
+            ? undefined
+            : autoSelectedValue;
+    }
+
+    private getRenderedItems(
+        items: SlicerItem[],
+        selectedValue?: powerbi.PrimitiveValue
+    ): SlicerItem[] {
+        return items.map((item) => ({
+            ...item,
+            selected: this.areValuesEqual(item.value, selectedValue)
+        }));
+    }
+
+    private applyFilter(value: powerbi.PrimitiveValue, isUserInteraction: boolean): void {
         // Power BI expects a JSON filter object that targets the bound field.
         const target = this.getFilterTarget();
 
         if (!target) {
             return;
+        }
+
+        if (isUserInteraction) {
+            this.hasUserInteracted = true;
         }
 
         const filter: BasicFilter = {
@@ -240,28 +344,17 @@ export class Visual implements IVisual {
         this.host.applyJsonFilter(filter, "general", "filter", FilterAction.merge);
     }
 
-    private clearFilter(): void {
+    private clearFilter(isUserInteraction: boolean): void {
         // Removing the filter is how the visual returns to the "All" state.
-        this.host.applyJsonFilter(null as unknown as powerbi.IFilter, "general", "filter", FilterAction.remove);
+        if (isUserInteraction) {
+            this.hasUserInteracted = true;
+        }
+
+        this.host.applyJsonFilter(null as unknown as powerbi.IFilter, "general", "filter", FilterAction.merge);
     }
 
     private getFilterTarget(): BasicFilter["target"] | undefined {
-        const queryName = this.fieldColumn?.source.queryName;
-
-        if (!queryName) {
-            return undefined;
-        }
-
-        const separatorIndex = queryName.lastIndexOf(".");
-
-        if (separatorIndex < 1 || separatorIndex === queryName.length - 1) {
-            return undefined;
-        }
-
-        return {
-            table: queryName.slice(0, separatorIndex),
-            column: queryName.slice(separatorIndex + 1)
-        };
+        return this.getFilterTargetFromColumn(this.fieldColumn);
     }
 
     private getSelectedValue(
@@ -312,6 +405,10 @@ export class Visual implements IVisual {
         return second !== undefined && String(first) === String(second);
     }
 
+    private stringifyPrimitive(value?: powerbi.PrimitiveValue): string | undefined {
+        return value === undefined ? undefined : String(value);
+    }
+
     private getSelectedItemIndex(items: SlicerItem[]): string {
         const selectedIndex = items.findIndex((item) => item.selected);
 
@@ -343,7 +440,56 @@ export class Visual implements IVisual {
     }
 
     private getColumnValues(column?: DataViewCategoryColumn): string[] {
-        return (column?.values ?? []).map((value) => String(value));
+        const uniqueValues = new Set<string>();
+
+        (column?.values ?? []).forEach((value) => {
+            const normalized = String(value).trim();
+
+            if (normalized) {
+                uniqueValues.add(normalized);
+            }
+        });
+
+        return [...uniqueValues];
+    }
+
+    private getDistinctItems(
+        values: powerbi.PrimitiveValue[],
+        selectedValue?: powerbi.PrimitiveValue
+    ): SlicerItem[] {
+        const seenValues = new Set<string>();
+
+        return values.reduce<SlicerItem[]>((items, value) => {
+            const key = String(value);
+
+            if (seenValues.has(key)) {
+                return items;
+            }
+
+            seenValues.add(key);
+            items.push({
+                value,
+                label: key,
+                selected: this.areValuesEqual(value, selectedValue)
+            });
+
+            return items;
+        }, []);
+    }
+
+    private syncInteractionState(fieldColumn?: DataViewCategoryColumn, preferredValue?: string): void {
+        const nextTarget = this.getFilterTargetFromColumn(fieldColumn);
+        const nextTargetKey = nextTarget ? `${nextTarget.table}.${nextTarget.column}` : undefined;
+        const nextPreferredSelectionKey = preferredValue || undefined;
+
+        if (
+            this.filterTargetKey !== nextTargetKey
+            || this.preferredSelectionKey !== nextPreferredSelectionKey
+        ) {
+            this.filterTargetKey = nextTargetKey;
+            this.preferredSelectionKey = nextPreferredSelectionKey;
+            this.hasUserInteracted = false;
+        }
     }
 
     private clearElement(element: HTMLElement): void {
