@@ -6,6 +6,10 @@ import "../style/visual.less";
 import DataView = powerbi.DataView;
 import DataViewCategoryColumn = powerbi.DataViewCategoryColumn;
 import FilterAction = powerbi.FilterAction;
+import ISandboxExtendedColorPalette = powerbi.extensibility.ISandboxExtendedColorPalette;
+import ISelectionManager = powerbi.extensibility.ISelectionManager;
+import ITooltipService = powerbi.extensibility.ITooltipService;
+import IVisualEventService = powerbi.extensibility.IVisualEventService;
 import IVisual = powerbi.extensibility.visual.IVisual;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
@@ -52,6 +56,10 @@ export class Visual implements IVisual {
     private readonly root: HTMLDivElement;
     private readonly formattingSettingsService: FormattingSettingsService;
     private readonly host: IVisualHost;
+    private readonly selectionManager: ISelectionManager;
+    private readonly tooltipService: ITooltipService;
+    private readonly eventService: IVisualEventService;
+    private readonly colorPalette: ISandboxExtendedColorPalette;
     private formattingSettings: VisualFormattingSettingsModel;
     private fieldColumn?: DataViewCategoryColumn;
     private selectedValue?: powerbi.PrimitiveValue;
@@ -64,16 +72,37 @@ export class Visual implements IVisual {
             throw new Error("Visual constructor options are required.");
         }
 
-        this.formattingSettingsService = new FormattingSettingsService();
-        this.formattingSettings = new VisualFormattingSettingsModel();
         this.host = options.host;
+        this.selectionManager = this.host.createSelectionManager();
+        this.tooltipService = this.host.tooltipService;
+        this.eventService = this.host.eventService;
+        this.colorPalette = this.host.colorPalette;
+        this.formattingSettingsService = new FormattingSettingsService(this.host.createLocalizationManager());
+        this.formattingSettings = new VisualFormattingSettingsModel();
         this.hasUserInteracted = false;
         this.root = document.createElement("div");
         this.root.className = "dynamic-slicer";
+        this.applyHostTheme();
+        this.selectionManager.registerOnSelectCallback(() => {
+            // Bookmark and slicer filter state is restored through jsonFilters on update.
+        });
+        this.root.addEventListener("contextmenu", (event) => this.showContextMenu(event));
         options.element.appendChild(this.root);
     }
 
     public update(options: VisualUpdateOptions): void {
+        this.eventService.renderingStarted(options);
+
+        try {
+            this.render(options);
+            this.eventService.renderingFinished(options);
+        } catch (error) {
+            this.eventService.renderingFailed(options, error instanceof Error ? error.message : String(error));
+            throw error;
+        }
+    }
+
+    private render(options: VisualUpdateOptions): void {
         const dataView = options.dataViews?.[0];
 
         // Makes the dataview for the vidsual from power bi raw datamodel 
@@ -87,6 +116,7 @@ export class Visual implements IVisual {
             VisualFormattingSettingsModel,
             dataView
         );
+        this.applyHostTheme();
         this.clearElement(this.root);
 
         if (isDebugPanelEnabled) {
@@ -121,11 +151,11 @@ export class Visual implements IVisual {
         const control = document.createElement("div");
         control.className = "dynamic-slicer__control";
 
-        if (this.formattingSettings.slicerCard.showTitle.value) {
-            const title = document.createElement("div");
-            title.className = "dynamic-slicer__title";
-            title.textContent = this.getTitleText();
-            control.appendChild(title);
+        if (this.formattingSettings.slicerCard.showHeader.value) {
+            const header = document.createElement("div");
+            header.className = "dynamic-slicer__header";
+            header.textContent = this.getHeaderText();
+            control.appendChild(header);
         }
 
         if (this.getDisplayMode() === "list") {
@@ -141,6 +171,7 @@ export class Visual implements IVisual {
         clearButton.setAttribute("aria-label", "Clear selections");
         clearButton.disabled = this.selectedValue === undefined;
         clearButton.addEventListener("click", () => this.clearFilter(true));
+        this.addTooltip(clearButton, "Clear selections");
 
         this.root.appendChild(control);
         this.root.appendChild(clearButton);
@@ -154,27 +185,54 @@ export class Visual implements IVisual {
         const selectWrapper = document.createElement("div");
         selectWrapper.className = "dynamic-slicer__select-wrapper";
 
-        const select = document.createElement("select");
-        select.className = "dynamic-slicer__select";
-        select.value = this.getSelectedItemIndex(items);
-        select.setAttribute("aria-label", this.getTitleText());
-        select.addEventListener("change", () => this.handleIndexedSelection(select.value, items));
+        const toggle = document.createElement("button");
+        toggle.className = "dynamic-slicer__select dynamic-slicer__select--selected";
+        toggle.type = "button";
+        toggle.textContent = this.getSelectedItemLabel(items);
+        toggle.setAttribute("aria-label", this.getHeaderText());
+        toggle.setAttribute("aria-haspopup", "listbox");
+        toggle.setAttribute("aria-expanded", "false");
 
-        const allOption = document.createElement("option");
-        allOption.value = "";
-        allOption.textContent = "All";
-        allOption.selected = this.selectedValue === undefined;
-        select.appendChild(allOption);
+        const list = document.createElement("div");
+        list.className = "dynamic-slicer__dropdown-list";
+        list.setAttribute("role", "listbox");
+        list.setAttribute("aria-label", this.getHeaderText());
 
-        items.forEach((slicerItem, index) => {
-            const option = document.createElement("option");
-            option.value = String(index);
-            option.textContent = slicerItem.label;
-            option.selected = slicerItem.selected;
-            select.appendChild(option);
+        list.appendChild(this.createListButton("All", this.selectedValue === undefined, () => this.clearFilter(true)));
+
+        items.forEach((slicerItem) => {
+            list.appendChild(this.createListButton(
+                slicerItem.label,
+                slicerItem.selected,
+                () => this.applyFilter(slicerItem.value, true)
+            ));
         });
 
-        selectWrapper.appendChild(select);
+        toggle.addEventListener("click", (event) => {
+            event.stopPropagation();
+
+            const isOpen = selectWrapper.classList.toggle("dynamic-slicer__select-wrapper--open");
+            toggle.setAttribute("aria-expanded", String(isOpen));
+        });
+
+        selectWrapper.addEventListener("click", (event) => event.stopPropagation());
+
+        const closeDropdown = () => {
+            selectWrapper.classList.remove("dynamic-slicer__select-wrapper--open");
+            toggle.setAttribute("aria-expanded", "false");
+            document.removeEventListener("click", closeDropdown);
+        };
+
+        toggle.addEventListener("click", () => {
+            if (selectWrapper.classList.contains("dynamic-slicer__select-wrapper--open")) {
+                document.addEventListener("click", closeDropdown);
+            } else {
+                document.removeEventListener("click", closeDropdown);
+            }
+        });
+
+        selectWrapper.appendChild(toggle);
+        selectWrapper.appendChild(list);
 
         return selectWrapper;
     }
@@ -183,7 +241,7 @@ export class Visual implements IVisual {
         const list = document.createElement("div");
         list.className = "dynamic-slicer__list";
         list.setAttribute("role", "listbox");
-        list.setAttribute("aria-label", this.getTitleText());
+        list.setAttribute("aria-label", this.getHeaderText());
 
         const allButton = this.createListButton("All", this.selectedValue === undefined, () => this.clearFilter(true));
         list.appendChild(allButton);
@@ -208,6 +266,7 @@ export class Visual implements IVisual {
         button.textContent = label;
         button.setAttribute("aria-selected", String(selected));
         button.addEventListener("click", onClick);
+        this.addTooltip(button, label);
 
         return button;
     }
@@ -251,21 +310,6 @@ export class Visual implements IVisual {
             },
             jsonFilters: debugState.jsonFilters ?? []
         };
-    }
-
-    private handleIndexedSelection(index: string, items: SlicerItem[]): void {
-        // In dropdown mode the empty option means "All", so clearing the filter
-        // is the equivalent of selecting no specific value.
-        if (index === "") {
-            this.clearFilter(true);
-            return;
-        }
-
-        const item = items[Number(index)];
-
-        if (item) {
-            this.applyFilter(item.value, true);
-        }
     }
 
     private getViewModel(dataView?: DataView, jsonFilters?: powerbi.IFilter[]): VisualViewModel {
@@ -323,6 +367,10 @@ export class Visual implements IVisual {
 
     private applyFilter(value: powerbi.PrimitiveValue, isUserInteraction: boolean): void {
         // Power BI expects a JSON filter object that targets the bound field.
+        if (isUserInteraction && this.host.hostCapabilities?.allowInteractions === false) {
+            return;
+        }
+
         const target = this.getFilterTarget();
 
         if (!target) {
@@ -346,6 +394,10 @@ export class Visual implements IVisual {
 
     private clearFilter(isUserInteraction: boolean): void {
         // Removing the filter is how the visual returns to the "All" state.
+        if (isUserInteraction && this.host.hostCapabilities?.allowInteractions === false) {
+            return;
+        }
+
         if (isUserInteraction) {
             this.hasUserInteracted = true;
         }
@@ -409,10 +461,10 @@ export class Visual implements IVisual {
         return value === undefined ? undefined : String(value);
     }
 
-    private getSelectedItemIndex(items: SlicerItem[]): string {
-        const selectedIndex = items.findIndex((item) => item.selected);
+    private getSelectedItemLabel(items: SlicerItem[]): string {
+        const selectedItem = items.find((item) => item.selected);
 
-        return selectedIndex >= 0 ? String(selectedIndex) : "";
+        return selectedItem?.label ?? "All";
     }
 
     private getDisplayMode(): DisplayMode {
@@ -422,10 +474,10 @@ export class Visual implements IVisual {
         return displayMode === "list" ? "list" : "dropdown";
     }
 
-    private getTitleText(): string {
-        const customTitle = this.formattingSettings.slicerCard.titleText.value.trim();
+    private getHeaderText(): string {
+        const customHeader = this.formattingSettings.slicerCard.headerText.value.trim();
 
-        return customTitle || this.fieldColumn?.source.displayName || "Field";
+        return customHeader || this.fieldColumn?.source.displayName || "Field";
     }
 
     private getCategoryColumnByRole(dataView: DataView | undefined, roleName: string): DataViewCategoryColumn | undefined {
@@ -490,6 +542,78 @@ export class Visual implements IVisual {
             this.preferredSelectionKey = nextPreferredSelectionKey;
             this.hasUserInteracted = false;
         }
+    }
+
+    private addTooltip(element: HTMLElement, value: string): void {
+        element.addEventListener("mouseenter", (event) => this.showTooltip(event, value));
+        element.addEventListener("mousemove", (event) => this.moveTooltip(event, value));
+        element.addEventListener("mouseleave", () => this.hideTooltip());
+    }
+
+    private showTooltip(event: MouseEvent, value: string): void {
+        if (!this.tooltipService.enabled()) {
+            return;
+        }
+
+        this.tooltipService.show({
+            coordinates: [event.clientX, event.clientY],
+            isTouchEvent: false,
+            dataItems: [{
+                displayName: this.getHeaderText(),
+                value
+            }],
+            identities: []
+        });
+    }
+
+    private moveTooltip(event: MouseEvent, value: string): void {
+        if (!this.tooltipService.enabled()) {
+            return;
+        }
+
+        this.tooltipService.move({
+            coordinates: [event.clientX, event.clientY],
+            isTouchEvent: false,
+            dataItems: [{
+                displayName: this.getHeaderText(),
+                value
+            }],
+            identities: []
+        });
+    }
+
+    private hideTooltip(): void {
+        if (this.tooltipService.enabled()) {
+            this.tooltipService.hide({
+                isTouchEvent: false,
+                immediately: false
+            });
+        }
+    }
+
+    private showContextMenu(event: MouseEvent): void {
+        event.preventDefault();
+
+        const selectionId = this.host.createSelectionIdBuilder().createSelectionId();
+        this.selectionManager.showContextMenu(selectionId, {
+            x: event.clientX,
+            y: event.clientY
+        });
+    }
+
+    private applyHostTheme(): void {
+        const foreground = this.colorPalette.foreground.value;
+        const background = this.colorPalette.background.value;
+        const neutral = this.colorPalette.foregroundNeutralSecondary.value;
+        const selected = this.colorPalette.isHighContrast
+            ? this.colorPalette.foregroundSelected.value
+            : this.colorPalette.getColor("DynamicSlicerSelection").value;
+
+        this.root.classList.toggle("dynamic-slicer--high-contrast", this.colorPalette.isHighContrast);
+        this.root.style.setProperty("--dynamic-slicer-foreground", foreground);
+        this.root.style.setProperty("--dynamic-slicer-background", background);
+        this.root.style.setProperty("--dynamic-slicer-border", neutral);
+        this.root.style.setProperty("--dynamic-slicer-selected", selected);
     }
 
     private clearElement(element: HTMLElement): void {

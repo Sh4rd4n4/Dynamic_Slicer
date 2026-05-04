@@ -49,6 +49,7 @@
   ],
   "supportsKeyboardFocus": true,
   "supportsEmptyDataView": true,
+  "supportsLandingPage": true,
   "objects": {
     "general": {
       "displayName": "General",
@@ -79,13 +80,13 @@
           }
         },
         "showTitle": {
-          "displayName": "Show title",
+          "displayName": "Show slicer header",
           "type": {
             "bool": true
           }
         },
         "titleText": {
-          "displayName": "Title text",
+          "displayName": "Slicer header",
           "type": {
             "text": true
           }

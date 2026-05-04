@@ -17,22 +17,22 @@ class SlicerCardSettings extends FormattingSettingsCard {
         value: displayModeItems[0]
     });
 
-    showTitle = new formattingSettings.ToggleSwitch({
+    showHeader = new formattingSettings.ToggleSwitch({
         name: "showTitle",
-        displayName: "Show title",
+        displayName: "Show slicer header",
         value: true
     });
 
-    titleText = new formattingSettings.TextInput({
+    headerText = new formattingSettings.TextInput({
         name: "titleText",
-        displayName: "Title text",
+        displayName: "Slicer header",
         placeholder: "Use field name",
         value: ""
     });
 
     name = "slicer";
     displayName = "Slicer";
-    slices: FormattingSettingsSlice[] = [this.displayMode, this.showTitle, this.titleText];
+    slices: FormattingSettingsSlice[] = [this.displayMode, this.showHeader, this.headerText];
 }
 
 export class VisualFormattingSettingsModel extends FormattingSettingsModel {
