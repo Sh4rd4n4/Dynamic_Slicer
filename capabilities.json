@@ -75,6 +75,10 @@
               {
                 "displayName": "List",
                 "value": "list"
+              },
+              {
+                "displayName": "Tiles",
+                "value": "tiles"
               }
             ]
           }
@@ -89,6 +93,27 @@
           "displayName": "Slicer header",
           "type": {
             "text": true
+          }
+        },
+        "showSelectAll": {
+          "displayName": "Show \"All\" option",
+          "type": {
+            "bool": true
+          }
+        },
+        "fallback": {
+          "displayName": "Fallback when default is hidden",
+          "type": {
+            "enumeration": [
+              {
+                "displayName": "First visible value",
+                "value": "firstVisible"
+              },
+              {
+                "displayName": "Latest visible value",
+                "value": "latestVisible"
+              }
+            ]
           }
         }
       }

@@ -6,7 +6,13 @@ import FormattingSettingsSlice = formattingSettings.Slice;
 
 export const displayModeItems = [
     { displayName: "Dropdown", value: "dropdown" },
-    { displayName: "List", value: "list" }
+    { displayName: "List", value: "list" },
+    { displayName: "Tiles", value: "tiles" }
+];
+
+export const fallbackItems = [
+    { displayName: "First visible value", value: "firstVisible" },
+    { displayName: "Latest visible value", value: "latestVisible" }
 ];
 
 class SlicerCardSettings extends FormattingSettingsCard {
@@ -30,9 +36,28 @@ class SlicerCardSettings extends FormattingSettingsCard {
         value: ""
     });
 
+    showSelectAll = new formattingSettings.ToggleSwitch({
+        name: "showSelectAll",
+        displayName: "Show \"All\" option",
+        value: true
+    });
+
+    fallback = new formattingSettings.ItemDropdown({
+        name: "fallback",
+        displayName: "Fallback when default is hidden",
+        items: fallbackItems,
+        value: fallbackItems[0]
+    });
+
     name = "slicer";
     displayName = "Slicer";
-    slices: FormattingSettingsSlice[] = [this.displayMode, this.showHeader, this.headerText];
+    slices: FormattingSettingsSlice[] = [
+        this.displayMode,
+        this.showHeader,
+        this.headerText,
+        this.showSelectAll,
+        this.fallback
+    ];
 }
 
 export class VisualFormattingSettingsModel extends FormattingSettingsModel {

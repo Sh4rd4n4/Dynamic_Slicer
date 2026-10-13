@@ -226,6 +226,33 @@
     border-color: var(--dynamic-slicer-selected, #333333);
 }
 
+.dynamic-slicer__list--tiles {
+    align-content: flex-start;
+    border: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.dynamic-slicer__list--tiles .dynamic-slicer__list-item {
+    border: 1px solid var(--dynamic-slicer-border, #c8c6c4);
+    flex: 1 1 80px;
+    padding: 3px 8px;
+    text-align: center;
+    width: auto;
+}
+
+.dynamic-slicer__list--tiles .dynamic-slicer__list-item::before {
+    display: none;
+}
+
+.dynamic-slicer__list--tiles .dynamic-slicer__list-item--selected,
+.dynamic-slicer__list--tiles .dynamic-slicer__list-item--selected:hover {
+    background: var(--dynamic-slicer-selected, #333333);
+    border-color: var(--dynamic-slicer-selected, #333333);
+    color: var(--dynamic-slicer-background, #ffffff);
+}
+
 .dynamic-slicer--high-contrast .dynamic-slicer__list-item:hover {
     outline: 1px solid var(--dynamic-slicer-foreground, #ffffff);
     outline-offset: -1px;

@@ -16,7 +16,7 @@ import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructor
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 
 import { VisualFormattingSettingsModel } from "./settings";
-import { resolveDynamicSelection } from "./dynamicSelection";
+import { FallbackStrategy, resolveDynamicSelection, toValueKey } from "./dynamicSelection";
 
 interface BasicFilter extends powerbi.IFilter {
     $schema: string;
@@ -42,7 +42,7 @@ interface VisualViewModel {
     selectedValue?: powerbi.PrimitiveValue;
 }
 
-type DisplayMode = "dropdown" | "list";
+type DisplayMode = "dropdown" | "list" | "tiles";
 const isDebugPanelEnabled = false;
 
 interface DebugState {
@@ -107,15 +107,15 @@ export class Visual implements IVisual {
 
         // Makes the dataview for the vidsual from power bi raw datamodel 
         const viewModel = this.getViewModel(dataView, options.jsonFilters);
+        this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
+            VisualFormattingSettingsModel,
+            dataView
+        );
         this.syncInteractionState(viewModel.fieldColumn, viewModel.dynamicSelectionValues[0]);
         const autoSelectedValue = this.resolveAutoSelectedValue(viewModel);
         const renderedItems = this.getRenderedItems(viewModel.items, autoSelectedValue ?? viewModel.selectedValue);
         this.fieldColumn = viewModel.fieldColumn;
         this.selectedValue = autoSelectedValue ?? viewModel.selectedValue;
-        this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
-            VisualFormattingSettingsModel,
-            dataView
-        );
         this.applyHostTheme();
         this.clearElement(this.root);
 
@@ -158,10 +158,12 @@ export class Visual implements IVisual {
             control.appendChild(header);
         }
 
-        if (this.getDisplayMode() === "list") {
-            control.appendChild(this.createList(renderedItems));
-        } else {
+        const displayMode = this.getDisplayMode();
+
+        if (displayMode === "dropdown") {
             control.appendChild(this.createDropdown(renderedItems));
+        } else {
+            control.appendChild(this.createList(renderedItems, displayMode === "tiles"));
         }
 
         const clearButton = document.createElement("button");
@@ -198,7 +200,9 @@ export class Visual implements IVisual {
         list.setAttribute("role", "listbox");
         list.setAttribute("aria-label", this.getHeaderText());
 
-        list.appendChild(this.createListButton("All", this.selectedValue === undefined, () => this.clearFilter(true)));
+        if (this.formattingSettings.slicerCard.showSelectAll.value) {
+            list.appendChild(this.createListButton("All", this.selectedValue === undefined, () => this.clearFilter(true)));
+        }
 
         items.forEach((slicerItem) => {
             list.appendChild(this.createListButton(
@@ -237,14 +241,17 @@ export class Visual implements IVisual {
         return selectWrapper;
     }
 
-    private createList(items: SlicerItem[]): HTMLElement {
+    private createList(items: SlicerItem[], asTiles: boolean): HTMLElement {
         const list = document.createElement("div");
-        list.className = "dynamic-slicer__list";
+        list.className = asTiles
+            ? "dynamic-slicer__list dynamic-slicer__list--tiles"
+            : "dynamic-slicer__list";
         list.setAttribute("role", "listbox");
         list.setAttribute("aria-label", this.getHeaderText());
 
-        const allButton = this.createListButton("All", this.selectedValue === undefined, () => this.clearFilter(true));
-        list.appendChild(allButton);
+        if (this.formattingSettings.slicerCard.showSelectAll.value) {
+            list.appendChild(this.createListButton("All", this.selectedValue === undefined, () => this.clearFilter(true)));
+        }
 
         items.forEach((slicerItem) => {
             list.appendChild(this.createListButton(
@@ -341,9 +348,8 @@ export class Visual implements IVisual {
 
         const autoSelectedValue = resolveDynamicSelection({
             visibleValues: viewModel.items.map((item) => item.value),
-            selectedValue: undefined,
-            strategy: "preferredValue",
-            preferredValue
+            preferredValue,
+            fallback: this.getFallbackStrategy()
         });
 
         if (autoSelectedValue === undefined) {
@@ -454,7 +460,7 @@ export class Visual implements IVisual {
     }
 
     private areValuesEqual(first: powerbi.PrimitiveValue, second?: powerbi.PrimitiveValue): boolean {
-        return second !== undefined && String(first) === String(second);
+        return second !== undefined && toValueKey(first) === toValueKey(second);
     }
 
     private stringifyPrimitive(value?: powerbi.PrimitiveValue): string | undefined {
@@ -471,7 +477,14 @@ export class Visual implements IVisual {
         const value = this.formattingSettings.slicerCard.displayMode.value;
         const displayMode = typeof value === "object" ? value.value : value;
 
-        return displayMode === "list" ? "list" : "dropdown";
+        return displayMode === "list" || displayMode === "tiles" ? displayMode : "dropdown";
+    }
+
+    private getFallbackStrategy(): FallbackStrategy {
+        const value = this.formattingSettings.slicerCard.fallback.value;
+        const fallback = typeof value === "object" ? value.value : value;
+
+        return fallback === "latestVisible" ? "latestVisible" : "firstVisible";
     }
 
     private getHeaderText(): string {
@@ -495,7 +508,7 @@ export class Visual implements IVisual {
         const uniqueValues = new Set<string>();
 
         (column?.values ?? []).forEach((value) => {
-            const normalized = String(value).trim();
+            const normalized = toValueKey(value);
 
             if (normalized) {
                 uniqueValues.add(normalized);
@@ -512,7 +525,7 @@ export class Visual implements IVisual {
         const seenValues = new Set<string>();
 
         return values.reduce<SlicerItem[]>((items, value) => {
-            const key = String(value);
+            const key = toValueKey(value);
 
             if (seenValues.has(key)) {
                 return items;
@@ -521,7 +534,7 @@ export class Visual implements IVisual {
             seenValues.add(key);
             items.push({
                 value,
-                label: key,
+                label: key || "(Blank)",
                 selected: this.areValuesEqual(value, selectedValue)
             });
 
