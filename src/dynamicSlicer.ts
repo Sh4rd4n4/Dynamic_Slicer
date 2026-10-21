@@ -134,17 +134,10 @@ export class Visual implements IVisual {
             this.applyFilter(autoSelectedValue, false);
         }
 
-        if (renderedItems.length === 0) {
-            const emptyState = document.createElement("div");
-            emptyState.className = "dynamic-slicer__empty";
-            emptyState.append("Bind a field to ");
-
-            const strong = document.createElement("strong");
-            strong.textContent = "Field";
-            emptyState.appendChild(strong);
-            emptyState.append(" to start inspecting slicer behavior.");
-
-            this.root.appendChild(emptyState);
+        // Only show the placeholder when no field is bound. A bound field with no
+        // visible values (e.g. everything hidden by RLS) still renders an empty slicer.
+        if (!viewModel.fieldColumn) {
+            this.root.appendChild(this.createPlaceholder());
             return;
         }
 
@@ -168,6 +161,7 @@ export class Visual implements IVisual {
 
         const clearButton = document.createElement("button");
         clearButton.className = "dynamic-slicer__clear";
+        clearButton.appendChild(this.createEraserIcon());
         clearButton.type = "button";
         clearButton.title = "Clear selections";
         clearButton.setAttribute("aria-label", "Clear selections");
@@ -188,7 +182,7 @@ export class Visual implements IVisual {
         selectWrapper.className = "dynamic-slicer__select-wrapper";
 
         const toggle = document.createElement("button");
-        toggle.className = "dynamic-slicer__select dynamic-slicer__select--selected";
+        toggle.className = "dynamic-slicer__select";
         toggle.type = "button";
         toggle.textContent = this.getSelectedItemLabel(items);
         toggle.setAttribute("aria-label", this.getHeaderText());
@@ -276,6 +270,58 @@ export class Visual implements IVisual {
         this.addTooltip(button, label);
 
         return button;
+    }
+
+    private createSvgElement(tagName: string, attributes: Record<string, string>): SVGElement {
+        const element = document.createElementNS("http://www.w3.org/2000/svg", tagName);
+
+        Object.keys(attributes).forEach((name) => element.setAttribute(name, attributes[name]));
+
+        return element;
+    }
+
+    private createEraserIcon(): SVGElement {
+        const icon = this.createSvgElement("svg", {
+            "aria-hidden": "true",
+            class: "dynamic-slicer__clear-icon",
+            fill: "none",
+            height: "16",
+            stroke: "currentColor",
+            "stroke-linejoin": "round",
+            "stroke-width": "1",
+            viewBox: "0 0 16 16",
+            width: "16"
+        });
+
+        icon.appendChild(this.createSvgElement("path", { d: "M9.5 2.5l4 4-6.5 6.5H5L2.5 10.5z" }));
+        icon.appendChild(this.createSvgElement("path", { d: "M5.5 6.5l4 4" }));
+        icon.appendChild(this.createSvgElement("path", { d: "M7 13h6.5", "stroke-linecap": "round" }));
+
+        return icon;
+    }
+
+    private createPlaceholder(): HTMLElement {
+        // Mimics the grey slicer outline Power BI shows for an empty slicer.
+        const placeholder = document.createElement("div");
+        placeholder.className = "dynamic-slicer__placeholder";
+
+        const icon = this.createSvgElement("svg", {
+            "aria-hidden": "true",
+            fill: "none",
+            stroke: "currentColor",
+            "stroke-width": "1.5",
+            viewBox: "0 0 48 48"
+        });
+
+        icon.appendChild(this.createSvgElement("path", { d: "M8 8h20", "stroke-linecap": "round" }));
+        [16, 26, 36].forEach((y) => {
+            icon.appendChild(this.createSvgElement("rect", { x: "8", y: String(y), width: "6", height: "6" }));
+            icon.appendChild(this.createSvgElement("path", { d: `M19 ${y + 3}h21`, "stroke-linecap": "round" }));
+        });
+
+        placeholder.appendChild(icon);
+
+        return placeholder;
     }
 
     private createDebugPanel(debugState: DebugState): HTMLElement {
@@ -618,9 +664,10 @@ export class Visual implements IVisual {
         const foreground = this.colorPalette.foreground.value;
         const background = this.colorPalette.background.value;
         const neutral = this.colorPalette.foregroundNeutralSecondary.value;
+        // The official slicer uses the theme foreground for selection, not a data colour.
         const selected = this.colorPalette.isHighContrast
             ? this.colorPalette.foregroundSelected.value
-            : this.colorPalette.getColor("DynamicSlicerSelection").value;
+            : foreground;
 
         this.root.classList.toggle("dynamic-slicer--high-contrast", this.colorPalette.isHighContrast);
         this.root.style.setProperty("--dynamic-slicer-foreground", foreground);

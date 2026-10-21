@@ -46,10 +46,6 @@ Current limitations:
 
 In the order they should be tackled:
 
-- [ ] Aesthetic quick fixes:
-  - Correct default colours (selection currently uses the theme's first data colour, so selected tiles show as blue on white)
-  - Fix the clear selection (eraser) icon so it matches the official one
-  - Make the empty slicer (no field bound) look like the official empty slicer instead of the dashed "Bind a field" box
 - [ ] Handle the 10,000-row data reduction limit on `Field` × `Dynamic Selection` (currently `top: 10000` in `capabilities.json`; rows past it are silently dropped and can trigger a wrong fallback):
   - Switch to `window` reduction and call `host.fetchMoreData(true)` until `dataView.metadata.segment` is undefined
   - Skip auto-selection until all segments are loaded
@@ -64,6 +60,7 @@ In the order they should be tackled:
 
 Done:
 
+- [x] Aesthetic quick fixes: selection uses the theme foreground colour (checkbox with checkmark, dark selected tiles), SVG eraser icon, official-style empty placeholder, and a bound field with no visible values now renders an empty slicer instead of the "Bind a field" box
 - [x] Document that the fallback only triggers when RLS filters the `Field` column itself; RLS on a fact table that doesn't propagate to the slicer's dimension leaves the report empty
 - [x] Fix value matching for non-text types (e.g. dates), previously compared via `String(value)`
 - [x] Wire up the `firstVisible` / `latestVisible` strategies as the "Fallback when default is hidden" option
