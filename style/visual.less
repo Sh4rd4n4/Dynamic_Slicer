@@ -126,8 +126,8 @@
     width: 16px;
 }
 
-.dynamic-slicer:hover .dynamic-slicer__clear:not(:disabled),
-.dynamic-slicer--hovered .dynamic-slicer__clear:not(:disabled),
+.dynamic-slicer:hover .dynamic-slicer__clear,
+.dynamic-slicer--hovered .dynamic-slicer__clear,
 .dynamic-slicer__clear:focus-visible {
     opacity: 1;
 }
@@ -136,10 +136,9 @@
     background: #f3f2f1;
 }
 
+/* Like the official slicer, the eraser still shows when nothing is selected; it just does nothing. */
 .dynamic-slicer__clear:disabled {
-    color: #c8c6c4;
     cursor: default;
-    opacity: 0;
 }
 
 .dynamic-slicer__list {

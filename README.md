@@ -60,7 +60,7 @@ In the order they should be tackled:
 
 Done:
 
-- [x] Aesthetic quick fixes: selection uses the theme foreground colour (checkbox with checkmark, dark selected tiles), SVG eraser icon, official-style empty placeholder, and a bound field with no visible values now renders an empty slicer instead of the "Bind a field" box
+- [x] Aesthetic quick fixes: selection uses the theme foreground colour (checkbox with checkmark, dark selected tiles), eraser icon from Fluent UI System Icons (shown on hover anywhere on the slicer, also when nothing is selected), official-style empty placeholder, and a bound field with no visible values now renders an empty slicer instead of the "Bind a field" box
 - [x] Document that the fallback only triggers when RLS filters the `Field` column itself; RLS on a fact table that doesn't propagate to the slicer's dimension leaves the report empty
 - [x] Fix value matching for non-text types (e.g. dates), previously compared via `String(value)`
 - [x] Wire up the `firstVisible` / `latestVisible` strategies as the "Fallback when default is hidden" option
