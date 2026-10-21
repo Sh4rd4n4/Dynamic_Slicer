@@ -67,6 +67,7 @@ export class Visual implements IVisual {
     private hasUserInteracted: boolean;
     private filterTargetKey?: string;
     private preferredSelectionKey?: string;
+    private isLoadingMoreData: boolean;
 
     constructor(options?: VisualConstructorOptions) {
         if (!options) {
@@ -81,6 +82,7 @@ export class Visual implements IVisual {
         this.formattingSettingsService = new FormattingSettingsService(this.host.createLocalizationManager());
         this.formattingSettings = new VisualFormattingSettingsModel();
         this.hasUserInteracted = false;
+        this.isLoadingMoreData = false;
         this.root = document.createElement("div");
         this.root.className = "dynamic-slicer";
         this.applyHostTheme();
@@ -114,7 +116,10 @@ export class Visual implements IVisual {
             dataView
         );
         this.syncInteractionState(viewModel.fieldColumn, viewModel.dynamicSelectionValues[0]);
-        const autoSelectedValue = this.resolveAutoSelectedValue(viewModel);
+        this.requestMoreData(options, dataView);
+        // Wait for all rows before auto-selecting, otherwise a default value that sits in a
+        // later segment would look hidden and trigger the fallback.
+        const autoSelectedValue = this.isLoadingMoreData ? undefined : this.resolveAutoSelectedValue(viewModel);
         const renderedItems = this.getRenderedItems(viewModel.items, autoSelectedValue ?? viewModel.selectedValue);
         this.fieldColumn = viewModel.fieldColumn;
         this.selectedValue = autoSelectedValue ?? viewModel.selectedValue;
@@ -357,6 +362,7 @@ export class Visual implements IVisual {
                 selectedValueFromJsonFilters: this.stringifyPrimitive(debugState.viewModel.selectedValue),
                 autoSelectedValue: this.stringifyPrimitive(debugState.autoSelectedValue),
                 hasUserInteracted: this.hasUserInteracted,
+                isLoadingMoreData: this.isLoadingMoreData,
                 filterTargetKey: this.filterTargetKey,
                 preferredSelectionKey: this.preferredSelectionKey
             },
@@ -378,6 +384,22 @@ export class Visual implements IVisual {
             items,
             selectedValue
         };
+    }
+
+    private requestMoreData(options: VisualUpdateOptions, dataView?: DataView): void {
+        // With "window" data reduction Power BI sends rows in segments; a segment in the
+        // metadata means more rows are available. fetchMoreData(true) merges them into the
+        // next update's dataView. It returns false when Power BI refuses (memory limit),
+        // in which case we continue with the rows we have.
+        if (!dataView?.metadata?.segment) {
+            this.isLoadingMoreData = false;
+            return;
+        }
+
+        // Only request on data updates, so resizes don't send duplicate requests.
+        if (options.type & powerbi.VisualUpdateType.Data) {
+            this.isLoadingMoreData = this.host.fetchMoreData(true);
+        }
     }
 
     private resolveAutoSelectedValue(viewModel: VisualViewModel): powerbi.PrimitiveValue | undefined {

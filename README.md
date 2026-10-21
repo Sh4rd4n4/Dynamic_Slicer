@@ -34,6 +34,7 @@ Current limitations:
 - Only single-select filtering is implemented
 - Formatting options are still minimal
 - Debug output exists in code but is disabled for normal builds
+- All slicer values are loaded up front, in segments of 10,000 rows. Power BI caps this at about 100 MB of data; if it refuses more, the slicer works with the values loaded so far
 
 ## Next steps
 
@@ -46,20 +47,17 @@ Current limitations:
 
 In the order they should be tackled:
 
-- [ ] Handle the 10,000-row data reduction limit on `Field` × `Dynamic Selection` (currently `top: 10000` in `capabilities.json`; rows past it are silently dropped and can trigger a wrong fallback):
-  - Switch to `window` reduction and call `host.fetchMoreData(true)` until `dataView.metadata.segment` is undefined
-  - Skip auto-selection until all segments are loaded
-  - Optionally warn if `Dynamic Selection` has more than one distinct value, since it multiplies the row count
-  - Later, with the official-slicer work: load more values as the list scrolls, and make search run a new query instead of filtering loaded rows
+- [ ] Optionally warn if `Dynamic Selection` has more than one distinct value, since it multiplies the row count
 - [ ] Respect saved / bookmarked selections on report load instead of always overwriting them with the `Dynamic Selection` value
 - [ ] Single select / multi-select (Ctrl + click) toggle
 - [ ] Full parity with the official slicer look and options:
   - Expose all the official colour / font / border / background / padding formatting options (header, items, selection)
-  - Search box
+  - Search box (official: "..." menu > Search); load more values as the list scrolls, and make search run a new query instead of filtering loaded rows
   - Compare remaining official style modes
 
 Done:
 
+- [x] Removed the 10,000-row limit: data is loaded in segments of 10,000 rows (`window` reduction + `fetchMoreData`) until everything has arrived, and auto-selection waits for the last segment
 - [x] Aesthetic quick fixes: selection uses the theme foreground colour (checkbox with checkmark, dark selected tiles), eraser icon from Fluent UI System Icons (shown on hover anywhere on the slicer, also when nothing is selected), official-style empty placeholder, and a bound field with no visible values now renders an empty slicer instead of the "Bind a field" box
 - [x] Document that the fallback only triggers when RLS filters the `Field` column itself; RLS on a fact table that doesn't propagate to the slicer's dimension leaves the report empty
 - [x] Fix value matching for non-text types (e.g. dates), previously compared via `String(value)`

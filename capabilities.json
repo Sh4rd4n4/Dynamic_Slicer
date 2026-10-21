@@ -39,7 +39,7 @@
             }
           ],
           "dataReductionAlgorithm": {
-            "top": {
+            "window": {
               "count": 10000
             }
           }
