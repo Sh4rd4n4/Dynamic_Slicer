@@ -51,6 +51,7 @@ interface DebugState {
     viewModel: VisualViewModel;
 }
 
+const fluentEraserPath = "M11.197 2.43934C11.7828 1.85355 12.7326 1.85355 13.3184 2.43934L17.561 6.68198C18.1468 7.26777 18.1468 8.21751 17.561 8.8033L9.36408 17.0002H14.5001C14.7763 17.0002 15.0001 17.2241 15.0001 17.5002C15.0001 17.7764 14.7763 18.0002 14.5001 18.0002H7.81974C7.40996 18.0217 6.99303 17.876 6.68003 17.5629L2.43739 13.3203C1.8516 12.7345 1.8516 11.7848 2.43739 11.199L11.197 2.43934ZM12.6112 3.14645C12.416 2.95118 12.0994 2.95118 11.9041 3.14645L5.53846 9.51212L10.4882 14.4619L16.8539 8.09619C17.0491 7.90093 17.0491 7.58435 16.8539 7.38909L12.6112 3.14645ZM9.7811 15.169L4.83135 10.2192L3.14449 11.9061C2.94923 12.1014 2.94923 12.4179 3.14449 12.6132L7.38713 16.8558C7.5824 17.0511 7.89898 17.0511 8.09424 16.8558L9.7811 15.169Z";
 const basicFilterSchema = ["ht", "tp://powerbi.com/product/schema#basic"].join(""); // Avoids lint issue with "http"
 export class Visual implements IVisual {
     private readonly root: HTMLDivElement;
@@ -87,6 +88,7 @@ export class Visual implements IVisual {
             // Bookmark and slicer filter state is restored through jsonFilters on update.
         });
         this.root.addEventListener("contextmenu", (event) => this.showContextMenu(event));
+        this.trackHover(options.element);
         options.element.appendChild(this.root);
     }
 
@@ -281,21 +283,18 @@ export class Visual implements IVisual {
     }
 
     private createEraserIcon(): SVGElement {
+        // "Eraser" (20 regular) from Fluent UI System Icons, MIT licensed:
+        // https://github.com/microsoft/fluentui-system-icons
         const icon = this.createSvgElement("svg", {
             "aria-hidden": "true",
             class: "dynamic-slicer__clear-icon",
-            fill: "none",
+            fill: "currentColor",
             height: "16",
-            stroke: "currentColor",
-            "stroke-linejoin": "round",
-            "stroke-width": "1",
-            viewBox: "0 0 16 16",
+            viewBox: "0 0 20 20",
             width: "16"
         });
 
-        icon.appendChild(this.createSvgElement("path", { d: "M9.5 2.5l4 4-6.5 6.5H5L2.5 10.5z" }));
-        icon.appendChild(this.createSvgElement("path", { d: "M5.5 6.5l4 4" }));
-        icon.appendChild(this.createSvgElement("path", { d: "M7 13h6.5", "stroke-linecap": "round" }));
+        icon.appendChild(this.createSvgElement("path", { d: fluentEraserPath }));
 
         return icon;
     }
@@ -658,6 +657,16 @@ export class Visual implements IVisual {
             x: event.clientX,
             y: event.clientY
         });
+    }
+
+    private trackHover(container: HTMLElement): void {
+        // Like the official slicer, the eraser shows while hovering anywhere on the visual.
+        // Tracked on the host container because the root may not cover the whole visual area.
+        const setHovered = (hovered: boolean) => this.root.classList.toggle("dynamic-slicer--hovered", hovered);
+
+        container.addEventListener("mouseenter", () => setHovered(true));
+        container.addEventListener("mousemove", () => setHovered(true));
+        container.addEventListener("mouseleave", () => setHovered(false));
     }
 
     private applyHostTheme(): void {

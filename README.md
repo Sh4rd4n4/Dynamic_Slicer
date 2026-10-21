@@ -83,6 +83,10 @@ In practice, that means you can create a sorted table that gets filtered by RLS.
 
 **Important:** the fallback only looks at the values the slicer itself receives. RLS (or other filters) must filter the `Field` column, either directly or through a relationship that propagates to its table. If RLS only restricts a fact table and the filter doesn't reach the slicer's dimension, the default value stays visible in the slicer and the report can still show up empty.
 
+## Third-party assets
+
+The clear selection (eraser) icon is the "Eraser" icon from [Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons), Copyright (c) 2020 Microsoft Corporation, used under the MIT License.
+
 ## Compatibility
 
 This is only tested in Power BI Jan 2026 Desktop, tests in Power BI 2024 and Power BI Report Server 2024 and 2026 are planned.

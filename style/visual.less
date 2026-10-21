@@ -107,7 +107,7 @@
     align-items: center;
     background: transparent;
     border: 0;
-    color: var(--dynamic-slicer-border, #666666);
+    color: var(--dynamic-slicer-foreground, #252423);
     cursor: pointer;
     display: flex;
     height: 20px;
@@ -127,12 +127,13 @@
 }
 
 .dynamic-slicer:hover .dynamic-slicer__clear:not(:disabled),
+.dynamic-slicer--hovered .dynamic-slicer__clear:not(:disabled),
 .dynamic-slicer__clear:focus-visible {
     opacity: 1;
 }
 
 .dynamic-slicer__clear:hover:not(:disabled) {
-    color: var(--dynamic-slicer-foreground, #252423);
+    background: #f3f2f1;
 }
 
 .dynamic-slicer__clear:disabled {
