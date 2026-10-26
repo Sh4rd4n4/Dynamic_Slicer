@@ -1,3 +1,4 @@
+import powerbi from "powerbi-visuals-api";
 import { formattingSettings } from "powerbi-visuals-utils-formattingmodel";
 
 import FormattingSettingsCard = formattingSettings.SimpleCard;
@@ -11,9 +12,32 @@ export const displayModeItems = [
 ];
 
 export const fallbackItems = [
-    { displayName: "First visible value", value: "firstVisible" },
-    { displayName: "Latest visible value", value: "latestVisible" }
+    { displayName: "First in list", value: "firstVisible" },
+    { displayName: "Last in list", value: "lastVisible" },
+    { displayName: "Smallest value", value: "smallest" },
+    { displayName: "Largest value", value: "largest" }
 ];
+
+// Labels the smallest / largest rules for the bound field's data type.
+export function getFallbackItems(fieldType?: powerbi.ValueTypeDescriptor): powerbi.IEnumMember[] {
+    let smallest = "First alphabetically";
+    let largest = "Last alphabetically";
+
+    if (fieldType?.dateTime) {
+        smallest = "Earliest date";
+        largest = "Latest date";
+    } else if (fieldType?.numeric || fieldType?.integer) {
+        smallest = "Smallest value";
+        largest = "Largest value";
+    }
+
+    return [
+        fallbackItems[0],
+        fallbackItems[1],
+        { displayName: smallest, value: "smallest" },
+        { displayName: largest, value: "largest" }
+    ];
+}
 
 class SlicerCardSettings extends FormattingSettingsCard {
     displayMode = new formattingSettings.ItemDropdown({

@@ -15,7 +15,7 @@ import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 
-import { VisualFormattingSettingsModel } from "./settings";
+import { VisualFormattingSettingsModel, getFallbackItems } from "./settings";
 import { FallbackStrategy, resolveDynamicSelection, toValueKey } from "./dynamicSelection";
 
 interface BasicFilter extends powerbi.IFilter {
@@ -37,6 +37,7 @@ interface SlicerItem {
 
 interface VisualViewModel {
     fieldColumn?: DataViewCategoryColumn;
+    hasDynamicSelection: boolean;
     dynamicSelectionValues: string[];
     items: SlicerItem[];
     selectedValue?: powerbi.PrimitiveValue;
@@ -115,6 +116,7 @@ export class Visual implements IVisual {
             VisualFormattingSettingsModel,
             dataView
         );
+        this.updateFallbackSetting(viewModel);
         this.syncInteractionState(viewModel.fieldColumn, viewModel.dynamicSelectionValues[0]);
         this.requestMoreData(options, dataView);
         // Wait for all rows before auto-selecting, otherwise a default value that sits in a
@@ -380,6 +382,7 @@ export class Visual implements IVisual {
 
         return {
             fieldColumn,
+            hasDynamicSelection: dynamicSelectionColumn !== undefined,
             dynamicSelectionValues: this.getColumnValues(dynamicSelectionColumn),
             items,
             selectedValue
@@ -415,6 +418,7 @@ export class Visual implements IVisual {
 
         const autoSelectedValue = resolveDynamicSelection({
             visibleValues: viewModel.items.map((item) => item.value),
+            currentValue: viewModel.selectedValue,
             preferredValue,
             fallback: this.getFallbackStrategy()
         });
@@ -551,7 +555,26 @@ export class Visual implements IVisual {
         const value = this.formattingSettings.slicerCard.fallback.value;
         const fallback = typeof value === "object" ? value.value : value;
 
-        return fallback === "latestVisible" ? "latestVisible" : "firstVisible";
+        switch (fallback) {
+            case "lastVisible":
+            case "smallest":
+            case "largest":
+                return fallback;
+            default:
+                return "firstVisible";
+        }
+    }
+
+    private updateFallbackSetting(viewModel: VisualViewModel): void {
+        // The fallback rule only matters with a Dynamic Selection field, and its
+        // smallest / largest labels depend on the Field data type.
+        const fallback = this.formattingSettings.slicerCard.fallback;
+        const items = getFallbackItems(viewModel.fieldColumn?.source.type);
+        const selectedValue = this.getFallbackStrategy();
+
+        fallback.items = items;
+        fallback.value = items.find((item) => item.value === selectedValue) ?? items[0];
+        fallback.visible = viewModel.hasDynamicSelection;
     }
 
     private getHeaderText(): string {

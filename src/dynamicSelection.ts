@@ -2,10 +2,12 @@ import powerbi from "powerbi-visuals-api";
 
 type PrimitiveValue = powerbi.PrimitiveValue;
 
-export type FallbackStrategy = "firstVisible" | "latestVisible";
+export type FallbackStrategy = "firstVisible" | "lastVisible" | "smallest" | "largest";
 
 export interface DynamicSelectionInput {
     visibleValues: PrimitiveValue[];
+    // Selection restored from the saved report or a bookmark (via jsonFilters).
+    currentValue?: PrimitiveValue;
     preferredValue: string;
     fallback: FallbackStrategy;
 }
@@ -68,21 +70,37 @@ function compareValues(a: PrimitiveValue, b: PrimitiveValue): number {
     return toValueKey(a).localeCompare(toValueKey(b), undefined, { numeric: true });
 }
 
+// Priority: saved/bookmarked selection if visible, then the preferred (Dynamic Selection)
+// value if visible, then the fallback rule.
 export function resolveDynamicSelection(input: DynamicSelectionInput): PrimitiveValue | undefined {
     if (input.visibleValues.length === 0) {
         return undefined;
     }
 
-    const match = input.visibleValues.find(
-        (value) => toValueKey(value) === input.preferredValue
-    );
+    const findVisible = (key: string) => input.visibleValues.find((value) => toValueKey(value) === key);
 
-    if (match !== undefined) {
-        return match;
+    if (input.currentValue !== undefined) {
+        const current = findVisible(toValueKey(input.currentValue));
+
+        if (current !== undefined) {
+            return current;
+        }
+    }
+
+    const preferred = findVisible(input.preferredValue);
+
+    if (preferred !== undefined) {
+        return preferred;
     }
 
     switch (input.fallback) {
-        case "latestVisible": {
+        case "lastVisible":
+            return input.visibleValues[input.visibleValues.length - 1];
+
+        case "smallest":
+            return [...input.visibleValues].sort(compareValues)[0];
+
+        case "largest": {
             const sorted = [...input.visibleValues].sort(compareValues);
 
             return sorted[sorted.length - 1];

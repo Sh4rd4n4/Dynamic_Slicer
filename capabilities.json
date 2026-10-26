@@ -106,12 +106,20 @@
           "type": {
             "enumeration": [
               {
-                "displayName": "First visible value",
+                "displayName": "First in list",
                 "value": "firstVisible"
               },
               {
-                "displayName": "Latest visible value",
-                "value": "latestVisible"
+                "displayName": "Last in list",
+                "value": "lastVisible"
+              },
+              {
+                "displayName": "Smallest value",
+                "value": "smallest"
+              },
+              {
+                "displayName": "Largest value",
+                "value": "largest"
               }
             ]
           }
