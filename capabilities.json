@@ -95,6 +95,18 @@
             "text": true
           }
         },
+        "singleSelect": {
+          "displayName": "Single select",
+          "type": {
+            "bool": true
+          }
+        },
+        "multiSelectWithCtrl": {
+          "displayName": "Multi-select with CTRL",
+          "type": {
+            "bool": true
+          }
+        },
         "showSelectAll": {
           "displayName": "Show \"All\" option",
           "type": {

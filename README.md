@@ -23,7 +23,8 @@ The visual now supports:
 
 - Dropdown, list and tiles display modes
 - Optional title display and custom title text
-- Clear selection / `All` state, with an option to hide the `All` item
+- Clear selection with the eraser icon
+- Selection options as in the official slicer: "Single select" (on by default), "Multi-select with CTRL" and "Show "All" option" (the last two only apply when single select is off)
 - Fallback rule: first in list, last in list, or smallest / largest (labelled for the field type: number, date or text); only shown when `Dynamic Selection` is bound
 - Saved and bookmarked selections are kept when visible to the user
 - Matching that works for text, numbers and dates (dates are compared as `YYYY-MM-DD`)
@@ -32,7 +33,6 @@ The visual now supports:
 
 Current limitations:
 
-- Only single-select filtering is implemented
 - Formatting options are still minimal
 - Debug output exists in code but is disabled for normal builds
 - All slicer values are loaded up front, in segments of 10,000 rows. Power BI caps this at about 100 MB of data; if it refuses more, the slicer works with the values loaded so far
@@ -47,7 +47,6 @@ Current limitations:
 
 In the order they should be tackled:
 
-- [ ] Single select / multi-select (Ctrl + click) toggle
 - [ ] Full parity with the official slicer look and options:
   - Expose all the official colour / font / border / background / padding formatting options (header, items, selection)
   - Search box (official: "..." menu > Search); load more values as the list scrolls, and make search run a new query instead of filtering loaded rows
@@ -55,6 +54,7 @@ In the order they should be tackled:
 
 Done:
 
+- [x] Single select / multi-select: "Single select" (default on), "Multi-select with CTRL" and "Show "All" option" in a Selection group, as in the official slicer. Saved / bookmarked multi-selections keep their visible values; the default and the fallback stay single values
 - [x] Saved / bookmarked selections win when visible to the user; otherwise the `Dynamic Selection` default, then the fallback rule. Without a `Dynamic Selection` field the slicer never auto-selects
 - [x] Fallback rule selectable in the format pane, with type-aware smallest / largest options (replaces the "warn on multiple `Dynamic Selection` values" idea)
 - [x] Removed the 10,000-row limit: data is loaded in segments of 10,000 rows (`window` reduction + `fetchMoreData`) until everything has arrived, and auto-selection waits for the last segment
@@ -62,7 +62,6 @@ Done:
 - [x] Document that the fallback only triggers when RLS filters the `Field` column itself; RLS on a fact table that doesn't propagate to the slicer's dimension leaves the report empty
 - [x] Fix value matching for non-text types (e.g. dates), previously compared via `String(value)`
 - [x] Tiles style mode
-- [x] Option to show / hide the "All" item
 
 ## How to use the visual
 
@@ -74,8 +73,8 @@ Done:
 
 Until the user clicks a value (or "All") in the slicer, it picks its selection in this order:
 
-1. **Saved or bookmarked selection**, if the user can see that value. This is the value the report was saved with, or the one a bookmark (e.g. a bookmark button) applied.
-2. **The `Dynamic Selection` value**, if the user can see it.
+1. **Saved or bookmarked selection**, if the user can see it. This is the selection the report was saved with, or the one a bookmark (e.g. a bookmark button) applied. With several values selected, the visible ones are kept and the hidden ones dropped; in single select mode only the first visible one is kept.
+2. **The `Dynamic Selection` value**, if the user can see it. This is always a single value, also in multi-select mode.
 3. **The fallback rule** ("Fallback when default is hidden" in the format pane): first in list, last in list, or smallest / largest. For dates this reads earliest / latest; for text, first / last alphabetically.
 
 If nothing is in `Dynamic Selection`, the slicer never changes its selection on its own; it behaves like a regular slicer and keeps saved and bookmarked values as they are, even when they are not visible. Use this for slicers driven by bookmark buttons.

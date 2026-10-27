@@ -1,9 +1,9 @@
 import powerbi from "powerbi-visuals-api";
 import { formattingSettings } from "powerbi-visuals-utils-formattingmodel";
 
-import FormattingSettingsCard = formattingSettings.SimpleCard;
+import FormattingSettingsCompositeCard = formattingSettings.CompositeCard;
+import FormattingSettingsGroup = formattingSettings.Group;
 import FormattingSettingsModel = formattingSettings.Model;
-import FormattingSettingsSlice = formattingSettings.Slice;
 
 export const displayModeItems = [
     { displayName: "Dropdown", value: "dropdown" },
@@ -39,7 +39,7 @@ export function getFallbackItems(fieldType?: powerbi.ValueTypeDescriptor): power
     ];
 }
 
-class SlicerCardSettings extends FormattingSettingsCard {
+class SlicerCardSettings extends FormattingSettingsCompositeCard {
     displayMode = new formattingSettings.ItemDropdown({
         name: "displayMode",
         displayName: "Style",
@@ -60,12 +60,6 @@ class SlicerCardSettings extends FormattingSettingsCard {
         value: ""
     });
 
-    showSelectAll = new formattingSettings.ToggleSwitch({
-        name: "showSelectAll",
-        displayName: "Show \"All\" option",
-        value: true
-    });
-
     fallback = new formattingSettings.ItemDropdown({
         name: "fallback",
         displayName: "Fallback when default is hidden",
@@ -73,15 +67,47 @@ class SlicerCardSettings extends FormattingSettingsCard {
         value: fallbackItems[0]
     });
 
+    // Selection options mirror the official slicer. Single select defaults to on (unlike
+    // the official slicer) so reports built before multi-select keep their behaviour.
+    singleSelect = new formattingSettings.ToggleSwitch({
+        name: "singleSelect",
+        displayName: "Single select",
+        value: true
+    });
+
+    multiSelectWithCtrl = new formattingSettings.ToggleSwitch({
+        name: "multiSelectWithCtrl",
+        displayName: "Multi-select with CTRL",
+        value: true
+    });
+
+    showSelectAll = new formattingSettings.ToggleSwitch({
+        name: "showSelectAll",
+        displayName: "Show \"All\" option",
+        value: false
+    });
+
+    optionsGroup = new FormattingSettingsGroup({
+        name: "options",
+        displayName: "Options",
+        slices: [this.displayMode, this.showHeader, this.headerText, this.fallback]
+    });
+
+    selectionGroup = new FormattingSettingsGroup({
+        name: "selection",
+        displayName: "Selection",
+        slices: [this.singleSelect, this.multiSelectWithCtrl, this.showSelectAll]
+    });
+
     name = "slicer";
     displayName = "Slicer";
-    slices: FormattingSettingsSlice[] = [
-        this.displayMode,
-        this.showHeader,
-        this.headerText,
-        this.showSelectAll,
-        this.fallback
-    ];
+    groups: FormattingSettingsGroup[] = [this.optionsGroup, this.selectionGroup];
+
+    onPreProcess(): void {
+        // As in the official slicer, these only apply when single select is off.
+        this.multiSelectWithCtrl.visible = !this.singleSelect.value;
+        this.showSelectAll.visible = !this.singleSelect.value;
+    }
 }
 
 export class VisualFormattingSettingsModel extends FormattingSettingsModel {

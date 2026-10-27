@@ -40,14 +40,14 @@ interface VisualViewModel {
     hasDynamicSelection: boolean;
     dynamicSelectionValues: string[];
     items: SlicerItem[];
-    selectedValue?: powerbi.PrimitiveValue;
+    selectedValues: powerbi.PrimitiveValue[];
 }
 
 type DisplayMode = "dropdown" | "list" | "tiles";
 const isDebugPanelEnabled = false;
 
 interface DebugState {
-    autoSelectedValue?: powerbi.PrimitiveValue;
+    autoSelectedValues?: powerbi.PrimitiveValue[];
     jsonFilters?: powerbi.IFilter[];
     viewModel: VisualViewModel;
 }
@@ -64,8 +64,9 @@ export class Visual implements IVisual {
     private readonly colorPalette: ISandboxExtendedColorPalette;
     private formattingSettings: VisualFormattingSettingsModel;
     private fieldColumn?: DataViewCategoryColumn;
-    private selectedValue?: powerbi.PrimitiveValue;
+    private selectedValues: powerbi.PrimitiveValue[];
     private hasUserInteracted: boolean;
+    private isDropdownOpen: boolean;
     private filterTargetKey?: string;
     private preferredSelectionKey?: string;
     private isLoadingMoreData: boolean;
@@ -82,7 +83,9 @@ export class Visual implements IVisual {
         this.colorPalette = this.host.colorPalette;
         this.formattingSettingsService = new FormattingSettingsService(this.host.createLocalizationManager());
         this.formattingSettings = new VisualFormattingSettingsModel();
+        this.selectedValues = [];
         this.hasUserInteracted = false;
+        this.isDropdownOpen = false;
         this.isLoadingMoreData = false;
         this.root = document.createElement("div");
         this.root.className = "dynamic-slicer";
@@ -121,26 +124,24 @@ export class Visual implements IVisual {
         this.requestMoreData(options, dataView);
         // Wait for all rows before auto-selecting, otherwise a default value that sits in a
         // later segment would look hidden and trigger the fallback.
-        const autoSelectedValue = this.isLoadingMoreData ? undefined : this.resolveAutoSelectedValue(viewModel);
-        const renderedItems = this.getRenderedItems(viewModel.items, autoSelectedValue ?? viewModel.selectedValue);
+        const autoSelectedValues = this.isLoadingMoreData ? undefined : this.resolveAutoSelectedValues(viewModel);
+        const selectedValues = autoSelectedValues ?? viewModel.selectedValues;
+        const renderedItems = this.getRenderedItems(viewModel.items, selectedValues);
         this.fieldColumn = viewModel.fieldColumn;
-        this.selectedValue = autoSelectedValue ?? viewModel.selectedValue;
+        this.selectedValues = selectedValues;
         this.applyHostTheme();
         this.clearElement(this.root);
 
         if (isDebugPanelEnabled) {
             this.root.appendChild(this.createDebugPanel({
-                autoSelectedValue,
+                autoSelectedValues,
                 jsonFilters: options.jsonFilters,
                 viewModel
             }));
         }
 
-        if (
-            autoSelectedValue !== undefined
-            && !this.areValuesEqual(autoSelectedValue, viewModel.selectedValue)
-        ) {
-            this.applyFilter(autoSelectedValue, false);
+        if (autoSelectedValues) {
+            this.applyFilter(autoSelectedValues, false);
         }
 
         // Only show the placeholder when no field is bound. A bound field with no
@@ -174,7 +175,7 @@ export class Visual implements IVisual {
         clearButton.type = "button";
         clearButton.title = "Clear selections";
         clearButton.setAttribute("aria-label", "Clear selections");
-        clearButton.disabled = this.selectedValue === undefined;
+        clearButton.disabled = this.selectedValues.length === 0;
         clearButton.addEventListener("click", () => this.clearFilter(true));
         this.addTooltip(clearButton, "Clear selections");
 
@@ -196,52 +197,50 @@ export class Visual implements IVisual {
         toggle.textContent = this.getSelectedItemLabel(items);
         toggle.setAttribute("aria-label", this.getHeaderText());
         toggle.setAttribute("aria-haspopup", "listbox");
-        toggle.setAttribute("aria-expanded", "false");
 
         const list = document.createElement("div");
         list.className = "dynamic-slicer__dropdown-list";
         list.setAttribute("role", "listbox");
         list.setAttribute("aria-label", this.getHeaderText());
-
-        if (this.formattingSettings.slicerCard.showSelectAll.value) {
-            list.appendChild(this.createListButton("All", this.selectedValue === undefined, () => this.clearFilter(true)));
-        }
-
-        items.forEach((slicerItem) => {
-            list.appendChild(this.createListButton(
-                slicerItem.label,
-                slicerItem.selected,
-                () => this.applyFilter(slicerItem.value, true)
-            ));
-        });
-
-        toggle.addEventListener("click", (event) => {
-            event.stopPropagation();
-
-            const isOpen = selectWrapper.classList.toggle("dynamic-slicer__select-wrapper--open");
-            toggle.setAttribute("aria-expanded", String(isOpen));
-        });
-
-        selectWrapper.addEventListener("click", (event) => event.stopPropagation());
+        list.setAttribute("aria-multiselectable", String(!this.isSingleSelect()));
+        this.appendItems(list, items);
 
         const closeDropdown = () => {
-            selectWrapper.classList.remove("dynamic-slicer__select-wrapper--open");
-            toggle.setAttribute("aria-expanded", "false");
+            this.setDropdownOpen(selectWrapper, toggle, false);
             document.removeEventListener("click", closeDropdown);
         };
 
+        // The DOM is rebuilt on every update, so the open state is kept on the visual.
+        // This keeps the dropdown open while picking several values in multi-select.
+        this.setDropdownOpen(selectWrapper, toggle, this.isDropdownOpen);
+
+        if (this.isDropdownOpen) {
+            document.addEventListener("click", closeDropdown);
+        }
+
         toggle.addEventListener("click", () => {
-            if (selectWrapper.classList.contains("dynamic-slicer__select-wrapper--open")) {
+            const isOpen = !this.isDropdownOpen;
+
+            this.setDropdownOpen(selectWrapper, toggle, isOpen);
+
+            if (isOpen) {
                 document.addEventListener("click", closeDropdown);
             } else {
                 document.removeEventListener("click", closeDropdown);
             }
         });
 
+        selectWrapper.addEventListener("click", (event) => event.stopPropagation());
         selectWrapper.appendChild(toggle);
         selectWrapper.appendChild(list);
 
         return selectWrapper;
+    }
+
+    private setDropdownOpen(selectWrapper: HTMLElement, toggle: HTMLElement, isOpen: boolean): void {
+        this.isDropdownOpen = isOpen;
+        selectWrapper.classList.toggle("dynamic-slicer__select-wrapper--open", isOpen);
+        toggle.setAttribute("aria-expanded", String(isOpen));
     }
 
     private createList(items: SlicerItem[], asTiles: boolean): HTMLElement {
@@ -251,23 +250,59 @@ export class Visual implements IVisual {
             : "dynamic-slicer__list";
         list.setAttribute("role", "listbox");
         list.setAttribute("aria-label", this.getHeaderText());
+        list.setAttribute("aria-multiselectable", String(!this.isSingleSelect()));
+        this.appendItems(list, items);
 
-        if (this.formattingSettings.slicerCard.showSelectAll.value) {
-            list.appendChild(this.createListButton("All", this.selectedValue === undefined, () => this.clearFilter(true)));
+        return list;
+    }
+
+    private appendItems(list: HTMLElement, items: SlicerItem[]): void {
+        if (this.isSelectAllShown()) {
+            list.appendChild(this.createListButton("All", this.selectedValues.length === 0, () => this.clearFilter(true)));
         }
 
         items.forEach((slicerItem) => {
             list.appendChild(this.createListButton(
                 slicerItem.label,
                 slicerItem.selected,
-                () => this.applyFilter(slicerItem.value, true)
+                (event) => this.onItemClick(slicerItem.value, event)
             ));
         });
-
-        return list;
     }
 
-    private createListButton(label: string, selected: boolean, onClick: () => void): HTMLButtonElement {
+    private onItemClick(value: powerbi.PrimitiveValue, event: MouseEvent): void {
+        if (this.isSingleSelect()) {
+            // Close right away: re-selecting the current value triggers no update/re-render.
+            this.isDropdownOpen = false;
+            this.root.querySelector(".dynamic-slicer__select-wrapper--open")
+                ?.classList.remove("dynamic-slicer__select-wrapper--open");
+            this.applyFilter([value], true);
+            return;
+        }
+
+        // Same rules as the official slicer: with "Multi-select with CTRL" a plain click
+        // replaces the selection and Ctrl + click adds / removes; without it every click
+        // adds / removes.
+        const isSelected = this.selectedValues.some((selected) => this.areValuesEqual(selected, value));
+        const isToggleClick = !this.formattingSettings.slicerCard.multiSelectWithCtrl.value || event.ctrlKey || event.metaKey;
+        let nextValues: powerbi.PrimitiveValue[];
+
+        if (isToggleClick) {
+            nextValues = isSelected
+                ? this.selectedValues.filter((selected) => !this.areValuesEqual(selected, value))
+                : [...this.selectedValues, value];
+        } else {
+            nextValues = isSelected && this.selectedValues.length === 1 ? [] : [value];
+        }
+
+        if (nextValues.length === 0) {
+            this.clearFilter(true);
+        } else {
+            this.applyFilter(nextValues, true);
+        }
+    }
+
+    private createListButton(label: string, selected: boolean, onClick: (event: MouseEvent) => void): HTMLButtonElement {
         const button = document.createElement("button");
         button.className = selected
             ? "dynamic-slicer__list-item dynamic-slicer__list-item--selected"
@@ -361,8 +396,8 @@ export class Visual implements IVisual {
                 firstPreferredValue: debugState.viewModel.dynamicSelectionValues[0]
             },
             filterState: {
-                selectedValueFromJsonFilters: this.stringifyPrimitive(debugState.viewModel.selectedValue),
-                autoSelectedValue: this.stringifyPrimitive(debugState.autoSelectedValue),
+                selectedValuesFromJsonFilters: debugState.viewModel.selectedValues.map((value) => toValueKey(value)),
+                autoSelectedValues: debugState.autoSelectedValues?.map((value) => toValueKey(value)),
                 hasUserInteracted: this.hasUserInteracted,
                 isLoadingMoreData: this.isLoadingMoreData,
                 filterTargetKey: this.filterTargetKey,
@@ -377,15 +412,15 @@ export class Visual implements IVisual {
         // sync with capabilities.json even if more roles are added later.
         const fieldColumn = this.getCategoryColumnByRole(dataView, "field");
         const dynamicSelectionColumn = this.getCategoryColumnByRole(dataView, "dynamicSelection");
-        const selectedValue = this.getSelectedValue(fieldColumn, jsonFilters);
-        const items = this.getDistinctItems(fieldColumn?.values ?? [], selectedValue);
+        const selectedValues = this.getSelectedValues(fieldColumn, jsonFilters);
+        const items = this.getDistinctItems(fieldColumn?.values ?? []);
 
         return {
             fieldColumn,
             hasDynamicSelection: dynamicSelectionColumn !== undefined,
             dynamicSelectionValues: this.getColumnValues(dynamicSelectionColumn),
             items,
-            selectedValue
+            selectedValues
         };
     }
 
@@ -405,7 +440,8 @@ export class Visual implements IVisual {
         }
     }
 
-    private resolveAutoSelectedValue(viewModel: VisualViewModel): powerbi.PrimitiveValue | undefined {
+    // Returns the selection to apply, or undefined when the current one should stay.
+    private resolveAutoSelectedValues(viewModel: VisualViewModel): powerbi.PrimitiveValue[] | undefined {
         if (this.hasUserInteracted) {
             return undefined;
         }
@@ -416,33 +452,39 @@ export class Visual implements IVisual {
             return undefined;
         }
 
-        const autoSelectedValue = resolveDynamicSelection({
+        let autoSelectedValues = resolveDynamicSelection({
             visibleValues: viewModel.items.map((item) => item.value),
-            currentValue: viewModel.selectedValue,
+            currentValues: viewModel.selectedValues,
             preferredValue,
             fallback: this.getFallbackStrategy()
         });
 
-        if (autoSelectedValue === undefined) {
+        if (this.isSingleSelect()) {
+            autoSelectedValues = autoSelectedValues.slice(0, 1);
+        }
+
+        if (autoSelectedValues.length === 0) {
             return undefined;
         }
 
-        return this.areValuesEqual(autoSelectedValue, viewModel.selectedValue)
+        return this.isSameSelection(autoSelectedValues, viewModel.selectedValues)
             ? undefined
-            : autoSelectedValue;
+            : autoSelectedValues;
     }
 
     private getRenderedItems(
         items: SlicerItem[],
-        selectedValue?: powerbi.PrimitiveValue
+        selectedValues: powerbi.PrimitiveValue[]
     ): SlicerItem[] {
+        const selectedKeys = new Set(selectedValues.map((value) => toValueKey(value)));
+
         return items.map((item) => ({
             ...item,
-            selected: this.areValuesEqual(item.value, selectedValue)
+            selected: selectedKeys.has(toValueKey(item.value))
         }));
     }
 
-    private applyFilter(value: powerbi.PrimitiveValue, isUserInteraction: boolean): void {
+    private applyFilter(values: powerbi.PrimitiveValue[], isUserInteraction: boolean): void {
         // Power BI expects a JSON filter object that targets the bound field.
         if (isUserInteraction && this.host.hostCapabilities?.allowInteractions === false) {
             return;
@@ -462,7 +504,7 @@ export class Visual implements IVisual {
             $schema: basicFilterSchema,
             target,
             operator: "In",
-            values: [value],
+            values,
             filterType: 1
         };
 
@@ -486,16 +528,16 @@ export class Visual implements IVisual {
         return this.getFilterTargetFromColumn(this.fieldColumn);
     }
 
-    private getSelectedValue(
+    private getSelectedValues(
         fieldColumn?: DataViewCategoryColumn,
         jsonFilters?: powerbi.IFilter[]
-    ): powerbi.PrimitiveValue | undefined {
+    ): powerbi.PrimitiveValue[] {
         // Power BI sends existing filter state back through jsonFilters, so this
         // method restores which item is currently selected when the visual rerenders.
         const target = this.getFilterTargetFromColumn(fieldColumn);
 
         if (!target || !jsonFilters) {
-            return undefined;
+            return [];
         }
 
         const matchingFilter = jsonFilters.find((filter) => {
@@ -508,7 +550,7 @@ export class Visual implements IVisual {
                 && candidate.values.length > 0;
         }) as BasicFilter | undefined;
 
-        return matchingFilter?.values[0];
+        return matchingFilter?.values ?? [];
     }
 
     private getFilterTargetFromColumn(fieldColumn?: DataViewCategoryColumn): BasicFilter["target"] | undefined {
@@ -534,14 +576,28 @@ export class Visual implements IVisual {
         return second !== undefined && toValueKey(first) === toValueKey(second);
     }
 
-    private stringifyPrimitive(value?: powerbi.PrimitiveValue): string | undefined {
-        return value === undefined ? undefined : String(value);
+    private isSameSelection(first: powerbi.PrimitiveValue[], second: powerbi.PrimitiveValue[]): boolean {
+        const secondKeys = new Set(second.map((value) => toValueKey(value)));
+
+        return first.length === second.length && first.every((value) => secondKeys.has(toValueKey(value)));
+    }
+
+    private isSingleSelect(): boolean {
+        return this.formattingSettings.slicerCard.singleSelect.value;
+    }
+
+    private isSelectAllShown(): boolean {
+        return !this.isSingleSelect() && this.formattingSettings.slicerCard.showSelectAll.value;
     }
 
     private getSelectedItemLabel(items: SlicerItem[]): string {
-        const selectedItem = items.find((item) => item.selected);
+        const selectedItems = items.filter((item) => item.selected);
 
-        return selectedItem?.label ?? "All";
+        if (selectedItems.length > 1) {
+            return "Multiple selections";
+        }
+
+        return selectedItems[0]?.label ?? "All";
     }
 
     private getDisplayMode(): DisplayMode {
@@ -608,10 +664,7 @@ export class Visual implements IVisual {
         return [...uniqueValues];
     }
 
-    private getDistinctItems(
-        values: powerbi.PrimitiveValue[],
-        selectedValue?: powerbi.PrimitiveValue
-    ): SlicerItem[] {
+    private getDistinctItems(values: powerbi.PrimitiveValue[]): SlicerItem[] {
         const seenValues = new Set<string>();
 
         return values.reduce<SlicerItem[]>((items, value) => {
@@ -625,7 +678,7 @@ export class Visual implements IVisual {
             items.push({
                 value,
                 label: key || "(Blank)",
-                selected: this.areValuesEqual(value, selectedValue)
+                selected: false
             });
 
             return items;

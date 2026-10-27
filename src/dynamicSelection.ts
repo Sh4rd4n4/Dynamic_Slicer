@@ -7,7 +7,7 @@ export type FallbackStrategy = "firstVisible" | "lastVisible" | "smallest" | "la
 export interface DynamicSelectionInput {
     visibleValues: PrimitiveValue[];
     // Selection restored from the saved report or a bookmark (via jsonFilters).
-    currentValue?: PrimitiveValue;
+    currentValues: PrimitiveValue[];
     preferredValue: string;
     fallback: FallbackStrategy;
 }
@@ -70,44 +70,45 @@ function compareValues(a: PrimitiveValue, b: PrimitiveValue): number {
     return toValueKey(a).localeCompare(toValueKey(b), undefined, { numeric: true });
 }
 
-// Priority: saved/bookmarked selection if visible, then the preferred (Dynamic Selection)
-// value if visible, then the fallback rule.
-export function resolveDynamicSelection(input: DynamicSelectionInput): PrimitiveValue | undefined {
+// Priority: the visible part of the saved/bookmarked selection, then the preferred
+// (Dynamic Selection) value if visible, then the fallback rule. The default and the
+// fallback are always a single value.
+export function resolveDynamicSelection(input: DynamicSelectionInput): PrimitiveValue[] {
     if (input.visibleValues.length === 0) {
-        return undefined;
+        return [];
     }
 
     const findVisible = (key: string) => input.visibleValues.find((value) => toValueKey(value) === key);
 
-    if (input.currentValue !== undefined) {
-        const current = findVisible(toValueKey(input.currentValue));
+    const visibleCurrent = input.currentValues
+        .map((value) => findVisible(toValueKey(value)))
+        .filter((value): value is PrimitiveValue => value !== undefined);
 
-        if (current !== undefined) {
-            return current;
-        }
+    if (visibleCurrent.length > 0) {
+        return visibleCurrent;
     }
 
     const preferred = findVisible(input.preferredValue);
 
     if (preferred !== undefined) {
-        return preferred;
+        return [preferred];
     }
 
     switch (input.fallback) {
         case "lastVisible":
-            return input.visibleValues[input.visibleValues.length - 1];
+            return [input.visibleValues[input.visibleValues.length - 1]];
 
         case "smallest":
-            return [...input.visibleValues].sort(compareValues)[0];
+            return [[...input.visibleValues].sort(compareValues)[0]];
 
         case "largest": {
             const sorted = [...input.visibleValues].sort(compareValues);
 
-            return sorted[sorted.length - 1];
+            return [sorted[sorted.length - 1]];
         }
 
         case "firstVisible":
         default:
-            return input.visibleValues[0];
+            return [input.visibleValues[0]];
     }
 }
