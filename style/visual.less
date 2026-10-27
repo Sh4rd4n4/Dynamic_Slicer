@@ -205,6 +205,13 @@
     background: rgba(0, 0, 0, 0.06);
 }
 
+// Touch devices can't hover, so the eraser stays visible there.
+@media (hover: none) {
+    .dynamic-slicer__clear {
+        opacity: 1;
+    }
+}
+
 /* Like the official slicer, the eraser still shows when nothing is selected; it just does nothing. */
 .dynamic-slicer__clear:disabled {
     cursor: default;

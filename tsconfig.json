@@ -4,6 +4,8 @@
     "module": "ES2020",
     "moduleResolution": "bundler",
     "strict": true,
+    "outDir": "./.tmp/build/",
+    "rootDir": ".",
     "sourceMap": true,
     "experimentalDecorators": false,
     "skipLibCheck": true,

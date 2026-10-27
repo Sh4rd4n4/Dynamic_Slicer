@@ -16,6 +16,7 @@ import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructor
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 
 import { formattingSettings } from "powerbi-visuals-utils-formattingmodel";
+import { valueFormatter } from "powerbi-visuals-utils-formattingutils";
 
 import { VisualFormattingSettingsModel, getFallbackItems } from "./settings";
 import { FallbackStrategy, resolveDynamicSelection, toValueKey } from "./dynamicSelection";
@@ -73,6 +74,8 @@ export class Visual implements IVisual {
     private preferredSelectionKey?: string;
     private isLoadingMoreData: boolean;
     private searchText: string;
+    private lastPointerType: string;
+    private orphanedFilterKey?: string;
 
     constructor(options?: VisualConstructorOptions) {
         if (!options) {
@@ -91,6 +94,7 @@ export class Visual implements IVisual {
         this.isDropdownOpen = false;
         this.isLoadingMoreData = false;
         this.searchText = "";
+        this.lastPointerType = "";
         this.root = document.createElement("div");
         this.root.className = "dynamic-slicer";
         this.applyHostTheme();
@@ -98,6 +102,10 @@ export class Visual implements IVisual {
             // Bookmark and slicer filter state is restored through jsonFilters on update.
         });
         this.root.addEventListener("contextmenu", (event) => this.showContextMenu(event));
+        // Remembered so item clicks can tell taps from mouse clicks (see onItemClick).
+        this.root.addEventListener("pointerdown", (event) => {
+            this.lastPointerType = event.pointerType;
+        });
         this.trackHover(options.element);
         options.element.appendChild(this.root);
     }
@@ -148,6 +156,8 @@ export class Visual implements IVisual {
 
         if (autoSelectedValues) {
             this.applyFilter(autoSelectedValues, false);
+        } else if (options.type & powerbi.VisualUpdateType.Data) {
+            this.clearOrphanedFilter(viewModel.fieldColumn, options.jsonFilters);
         }
 
         // Only show the placeholder when no field is bound. A bound field with no
@@ -323,7 +333,11 @@ export class Visual implements IVisual {
         // replaces the selection and Ctrl + click adds / removes; without it every click
         // adds / removes.
         const isSelected = this.selectedValues.some((selected) => this.areValuesEqual(selected, value));
-        const isToggleClick = !this.formattingSettings.slicerCard.multiSelectWithCtrl.value || event.ctrlKey || event.metaKey;
+        // Touch devices have no Ctrl key, so taps always add / remove.
+        const isToggleClick = !this.formattingSettings.slicerCard.multiSelectWithCtrl.value
+            || event.ctrlKey
+            || event.metaKey
+            || this.lastPointerType === "touch";
         let nextValues: powerbi.PrimitiveValue[];
 
         if (isToggleClick) {
@@ -486,7 +500,7 @@ export class Visual implements IVisual {
         const fieldColumn = this.getCategoryColumnByRole(dataView, "field");
         const dynamicSelectionColumn = this.getCategoryColumnByRole(dataView, "dynamicSelection");
         const selectedValues = this.getSelectedValues(fieldColumn, jsonFilters);
-        const items = this.getDistinctItems(fieldColumn?.values ?? []);
+        const items = this.getDistinctItems(fieldColumn);
 
         return {
             fieldColumn,
@@ -595,6 +609,31 @@ export class Visual implements IVisual {
         }
 
         this.host.applyJsonFilter(null as unknown as powerbi.IFilter, "general", "filter", FilterAction.merge);
+    }
+
+    private clearOrphanedFilter(fieldColumn?: DataViewCategoryColumn, jsonFilters?: powerbi.IFilter[]): void {
+        // When Field is removed or replaced, the filter on the old column would keep
+        // filtering the report with nothing in the slicer showing it. Drop it, like the
+        // official slicer. Tried once per filter, so a host that keeps it can't cause a loop.
+        const target = this.getFilterTargetFromColumn(fieldColumn);
+        const orphaned = (jsonFilters ?? []).find((filter) => {
+            const candidate = (filter as BasicFilter).target;
+
+            return candidate !== undefined
+                && (!target || candidate.table !== target.table || candidate.column !== target.column);
+        });
+
+        if (!orphaned) {
+            this.orphanedFilterKey = undefined;
+            return;
+        }
+
+        const key = JSON.stringify((orphaned as BasicFilter).target);
+
+        if (this.orphanedFilterKey !== key) {
+            this.orphanedFilterKey = key;
+            this.clearFilter(false);
+        }
     }
 
     private getFilterTarget(): BasicFilter["target"] | undefined {
@@ -737,10 +776,11 @@ export class Visual implements IVisual {
         return [...uniqueValues];
     }
 
-    private getDistinctItems(values: powerbi.PrimitiveValue[]): SlicerItem[] {
+    private getDistinctItems(fieldColumn?: DataViewCategoryColumn): SlicerItem[] {
         const seenValues = new Set<string>();
+        const formatLabel = this.createLabelFormatter(fieldColumn);
 
-        return values.reduce<SlicerItem[]>((items, value) => {
+        return (fieldColumn?.values ?? []).reduce<SlicerItem[]>((items, value) => {
             const key = toValueKey(value);
 
             if (seenValues.has(key)) {
@@ -750,12 +790,32 @@ export class Visual implements IVisual {
             seenValues.add(key);
             items.push({
                 value,
-                label: key || "(Blank)",
+                label: key ? formatLabel(value) : "(Blank)",
                 selected: false
             });
 
             return items;
         }, []);
+    }
+
+    private createLabelFormatter(fieldColumn?: DataViewCategoryColumn): (value: powerbi.PrimitiveValue) => string {
+        // Labels use the model's format string and the report locale, like the official
+        // slicer. Matching and filtering keep using the raw value (see toValueKey).
+        const formatter = valueFormatter.create({
+            // Falls back to a default per type when the column has no format string
+            // (e.g. short date, and no thousands separator for years).
+            format: fieldColumn ? valueFormatter.getFormatStringByColumn(fieldColumn.source) : undefined,
+            columnType: fieldColumn?.source.type,
+            cultureSelector: this.host.locale
+        });
+
+        return (value) => {
+            try {
+                return formatter.format(value) || toValueKey(value);
+            } catch {
+                return toValueKey(value);
+            }
+        };
     }
 
     private syncInteractionState(fieldColumn?: DataViewCategoryColumn, preferredValue?: string): void {

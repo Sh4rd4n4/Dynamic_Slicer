@@ -6,14 +6,21 @@ A slicer that can change its default value based on RLS filtering.
 
 1. Install project dependencies:
    `npm install`
-2. Package the visual with the Node 24-safe command:
-   `npm run package:node24`
+2. Package the visual:
+   `npm run package`
 3. Look for the built `.pbiviz` in `dist/`
+
+Checks run for AppSource certification (all must pass without errors):
+
+- `npm run eslint` (Power BI recommended config, see `eslint.config.mjs`)
+- `npm audit` (no moderate or higher warnings)
+- `npx pbiviz package --certification-audit` (no external requests)
 
 Build notes:
 
-- `pbiviz` may still print certificate or webpack logger errors on Node 24 after the package is created, but the built visual still works
-- The regular `npm run package` command is kept for compatibility, but use `npm run package:node24`
+- `tsconfig.json` must keep `outDir`: without it, `powerbi-visuals-webpack-plugin` runs the build twice and `pbiviz` exits with a webpack `timeEnd` error
+- `package.json` overrides `qs` and `uuid`, which `powerbi-visuals-tools` pulls in at vulnerable versions through its dev server; remove the overrides once the tools ship fixed versions
+- API 5.11 is also tested on Power BI Report Server January 2026
 
 ## Working notes
 
@@ -30,6 +37,8 @@ The visual now supports:
 - Selection options as in the official slicer: "Single select" (on by default), "Multi-select with CTRL" and "Show "All" option" (the last two only apply when single select is off)
 - Fallback rule: first in list, last in list, or smallest / largest (labelled for the field type: number, date or text); only shown when `Dynamic Selection` is bound
 - Saved and bookmarked selections are kept when visible to the user
+- Values shown with the model's format string and the report locale, like the official slicer
+- Touch devices: the eraser stays visible, and taps add / remove values in multi-select
 - Matching that works for text, numbers and dates (dates are compared as `YYYY-MM-DD`)
 - Filter-state restore from Power BI `jsonFilters`
 - Automatic reset of the auto-selection guard when the bound field or preferred value changes
@@ -50,9 +59,26 @@ Current limitations:
 
 In the order they should be tackled:
 
+AppSource / certification readiness:
+
+- [ ] Use `BasicFilter` from `powerbi-models` instead of the hand-written filter and split schema URL; clear with `FilterAction.remove`
+- [ ] Remove leftovers: debug panel, empty `registerOnSelectCallback`, empty `drilldown` in capabilities, comment typos
+- [ ] Close the dropdown when the user clicks elsewhere on the report
+- [ ] Check responsiveness with 20,000+ values (AppSource tests at least 20,000 rows)
+- [ ] Accessibility: `role="option"` on items, Escape / arrow keys in the dropdown
+- [ ] Before submitting: `certification` branch matching the package, without `builds/`; version `1.0.0.0`; synthetic offline sample `.pbix` with a hints page; 300 × 300 logo, 1366 × 768 screenshots, privacy policy and support URLs, EULA
+
+Other:
+
 - [ ] Decide whether to add the official range styles (Between, Before, After, Relative date / time) for number and date fields
 
 Done:
+
+- [x] MIT `LICENSE`
+- [x] Values formatted with the model's format string and the report locale (dates, numbers, years); matching still uses the raw value
+- [x] Touch support: the eraser is always visible on devices without hover, and taps add / remove values even with "Multi-select with CTRL" on
+- [x] The filter is cleared when `Field` is removed or replaced (unless the new field auto-selects a value), so no orphaned filter stays on the old column
+- [x] Certification tooling: API 5.11.1, latest `powerbi-visuals-tools`, ESLint with the Power BI recommended config, clean `npm audit`, plain `pbiviz package` exits without errors, third-party notices
 
 - [x] Formatting parity with the official slicer: "Slicer settings" / "Slicer header" / "Values" cards with font, colours, background, borders and spacing; search box; transparent background. Header settings from older reports are carried over
 - [x] Single select / multi-select: "Single select" (default on), "Multi-select with CTRL" and "Show "All" option" in a Selection group, as in the official slicer. Saved / bookmarked multi-selections keep their visible values; the default and the fallback stay single values
@@ -88,7 +114,7 @@ In practice, that means you can create a sorted table that gets filtered by RLS.
 
 ## Third-party assets
 
-The clear selection (eraser) icon is the "Eraser" icon from [Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons), Copyright (c) 2020 Microsoft Corporation, used under the MIT License.
+The clear selection (eraser) icon is the "Eraser" icon from [Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons), Copyright (c) 2020 Microsoft Corporation, used under the MIT License. The full license text is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Compatibility
 
