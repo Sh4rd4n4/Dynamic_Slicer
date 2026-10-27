@@ -261,6 +261,12 @@
     background: rgba(0, 0, 0, 0.05);
 }
 
+// Shows where keyboard focus is when moving through values with the arrow keys.
+.dynamic-slicer__list-item:focus-visible {
+    outline: 1px solid var(--dynamic-slicer-foreground, #252423);
+    outline-offset: -1px;
+}
+
 .dynamic-slicer__list-item--selected::before {
     background: var(--dynamic-slicer-selected, #252423);
     border-color: var(--dynamic-slicer-selected, #252423);
@@ -328,36 +334,4 @@
     max-height: 60%;
     max-width: 60%;
     width: 48px;
-}
-
-.dynamic-slicer__debug {
-    background: #fff4ce;
-    border: 2px solid #ca5010;
-    box-sizing: border-box;
-    color: #201f1e;
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 11px;
-    line-height: 15px;
-    margin-bottom: 8px;
-    max-height: 220px;
-    overflow: auto;
-    padding: 6px 8px;
-    position: relative;
-    white-space: pre-wrap;
-    width: 100%;
-    z-index: 10;
-}
-
-.dynamic-slicer__debug summary {
-    cursor: pointer;
-    font-family: "Segoe UI", sans-serif;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 18px;
-}
-
-.dynamic-slicer__debug pre {
-    margin: 4px 0 0;
-    white-space: pre-wrap;
-    word-break: break-word;
 }

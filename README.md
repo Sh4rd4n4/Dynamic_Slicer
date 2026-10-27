@@ -1,123 +1,91 @@
 # Dynamic Slicer
 
-A slicer that can change its default value based on RLS filtering.
+A Power BI slicer with a **default selection that adapts to what each user is allowed to see**.
 
-## Local setup
+Row-level security (RLS) hides data per user, but a regular slicer keeps the value the report was saved with. When that value is hidden for someone, their report opens empty. Dynamic Slicer checks which values the current user can see and, when the default is hidden, falls back to a visible one, following a rule you choose. Everything else works like the built-in slicer.
 
-1. Install project dependencies:
-   `npm install`
-2. Package the visual:
-   `npm run package`
-3. Look for the built `.pbiviz` in `dist/`
+<!-- Demo: record the fallback in action and save it as docs/demo.gif, then uncomment:
+![Dynamic Slicer picking a visible value for a user whose default is hidden by RLS](docs/demo.gif)
+-->
 
-Checks run for AppSource certification (all must pass without errors):
+## Features
 
-- `npm run eslint` (Power BI recommended config, see `eslint.config.mjs`)
-- `npm audit` (no moderate or higher warnings)
-- `npx pbiviz package --certification-audit` (no external requests)
+**Dynamic default selection**
 
-Build notes:
+- A default value from a second column (`Dynamic Selection`), e.g. a calculated column holding the current period
+- A fallback rule for when that default is hidden: first or last in the list, or smallest / largest (shown as earliest / latest for dates and first / last alphabetically for text)
+- Saved and bookmarked selections are respected when the user can see them
+- Without a `Dynamic Selection` field it behaves exactly like a regular slicer, so bookmark buttons keep full control
 
-- `tsconfig.json` must keep `outDir`: without it, `powerbi-visuals-webpack-plugin` runs the build twice and `pbiviz` exits with a webpack `timeEnd` error
-- `package.json` overrides `qs` and `uuid`, which `powerbi-visuals-tools` pulls in at vulnerable versions through its dev server; remove the overrides once the tools ship fixed versions
-- API 5.11 is also tested on Power BI Report Server January 2026
+**Parity with the built-in slicer**
 
-## Working notes
+- Dropdown, list and tile styles, with optional search
+- Single select, multi-select (with or without CTRL) and a "Select all" option
+- Format pane laid out like the built-in slicer: header, values, fonts, colours, borders and spacing, following the report theme until overridden
+- Values formatted with the model's format strings
+- Clear selections with the eraser, sync slicers, bookmarks, tooltips and the context menu
+- Keyboard navigation, screen-reader roles, high contrast and touch devices
+- No row limit: values load in segments of 10,000 rows until all have arrived (tested with 20,000+)
 
-As of version 1.6.2+, the visual can dynamically adjust its selected value from a second categorical field. The first value received in `Dynamic Selection` is treated as the preferred default. If that value is visible in `Field`, the slicer applies it automatically; otherwise it falls back to another visible value, chosen by the "Fallback when default is hidden" rule. A selection saved in the report or applied by a bookmark takes priority when it is visible. Other values in `Dynamic Selection` are ignored.
+## Install
 
-The visual now supports:
+1. Download the `.pbiviz` file from the [latest release](https://github.com/Sh4rd4n4/Dynamic_Slicer/releases/latest).
+2. In Power BI Desktop, select **…** in the Visualizations pane > **Import a visual from a file**, and pick the downloaded file.
 
-- Dropdown, list and tiles display modes
-- Format pane laid out like the official slicer: "Slicer settings", "Slicer header" and "Values" cards
-- Header and values formatting: font (family, size, bold, italic, underline), font color, background, border (position, color, width) and spacing; values also have a selection color. Colours not set follow the report theme
-- Optional search box ("Slicer settings" > "Search"), filtering the loaded values as you type
-- Transparent background, so the visual's own "Background" setting applies, as with the official slicer
-- Clear selection with the eraser icon
-- Selection options as in the official slicer: "Single select" (on by default), "Multi-select with CTRL" and "Show "All" option" (the last two only apply when single select is off)
-- Fallback rule: first in list, last in list, or smallest / largest (labelled for the field type: number, date or text); only shown when `Dynamic Selection` is bound
-- Saved and bookmarked selections are kept when visible to the user
-- Values shown with the model's format string and the report locale, like the official slicer
-- Touch devices: the eraser stays visible, and taps add / remove values in multi-select
-- Matching that works for text, numbers and dates (dates are compared as `YYYY-MM-DD`)
-- Filter-state restore from Power BI `jsonFilters`
-- Automatic reset of the auto-selection guard when the bound field or preferred value changes
+## Use
 
-Current limitations:
-
-- Only the dropdown, list and tile styles; the official range styles (Between, Before, After, Relative date) are not available
-- The dropdown list can't extend past the visual's own box (custom visuals are drawn in an iframe the size of the visual), so it fits the space below the box and scrolls. Give a dropdown slicer extra height, or use the list / tiles style, if the list should show more than a few values
-- Debug output exists in code but is disabled for normal builds
-- All slicer values are loaded up front, in segments of 10,000 rows. Power BI caps this at about 100 MB of data; if it refuses more, the slicer works with the values loaded so far
-
-## Next steps
-
-- Add an option to automatically filter on the current year
-- Test compatibility in Power BI 2024 and Power BI Report Server 2024 / 2026
-
-## TODO
-
-In the order they should be tackled:
-
-AppSource / certification readiness:
-
-- [ ] Use `BasicFilter` from `powerbi-models` instead of the hand-written filter and split schema URL; clear with `FilterAction.remove`
-- [ ] Remove leftovers: debug panel, empty `registerOnSelectCallback`, empty `drilldown` in capabilities, comment typos
-- [ ] Close the dropdown when the user clicks elsewhere on the report
-- [ ] Check responsiveness with 20,000+ values (AppSource tests at least 20,000 rows)
-- [ ] Accessibility: `role="option"` on items, Escape / arrow keys in the dropdown
-- [ ] Before submitting: `certification` branch matching the package, without `builds/`; version `1.0.0.0`; synthetic offline sample `.pbix` with a hints page; 300 × 300 logo, 1366 × 768 screenshots, privacy policy and support URLs, EULA
-
-Other:
-
-- [ ] Decide whether to add the official range styles (Between, Before, After, Relative date / time) for number and date fields
-
-Done:
-
-- [x] MIT `LICENSE`
-- [x] Values formatted with the model's format string and the report locale (dates, numbers, years); matching still uses the raw value
-- [x] Touch support: the eraser is always visible on devices without hover, and taps add / remove values even with "Multi-select with CTRL" on
-- [x] The filter is cleared when `Field` is removed or replaced (unless the new field auto-selects a value), so no orphaned filter stays on the old column
-- [x] Certification tooling: API 5.11.1, latest `powerbi-visuals-tools`, ESLint with the Power BI recommended config, clean `npm audit`, plain `pbiviz package` exits without errors, third-party notices
-
-- [x] Formatting parity with the official slicer: "Slicer settings" / "Slicer header" / "Values" cards with font, colours, background, borders and spacing; search box; transparent background. Header settings from older reports are carried over
-- [x] Single select / multi-select: "Single select" (default on), "Multi-select with CTRL" and "Show "All" option" in a Selection group, as in the official slicer. Saved / bookmarked multi-selections keep their visible values; the default and the fallback stay single values
-- [x] Saved / bookmarked selections win when visible to the user; otherwise the `Dynamic Selection` default, then the fallback rule. Without a `Dynamic Selection` field the slicer never auto-selects
-- [x] Fallback rule selectable in the format pane, with type-aware smallest / largest options (replaces the "warn on multiple `Dynamic Selection` values" idea)
-- [x] Removed the 10,000-row limit: data is loaded in segments of 10,000 rows (`window` reduction + `fetchMoreData`) until everything has arrived, and auto-selection waits for the last segment
-- [x] Aesthetic quick fixes: selection uses the theme foreground colour (checkbox with checkmark, dark selected tiles), eraser icon from Fluent UI System Icons (shown on hover anywhere on the slicer, also when nothing is selected), official-style empty placeholder, and a bound field with no visible values now renders an empty slicer instead of the "Bind a field" box
-- [x] Document that the fallback only triggers when RLS filters the `Field` column itself; RLS on a fact table that doesn't propagate to the slicer's dimension leaves the report empty
-- [x] Fix value matching for non-text types (e.g. dates), previously compared via `String(value)`
-- [x] Tiles style mode
-
-## How to use the visual
-
-1) Download the .pbiviz file in the builds folder or build the .pbiviz file with npm (see above), then import it in your powerBI report. 
-
-2) Drag a dimension in "Field" to use it as a regular slicer, then drag the dynamic/default-value field to "Dynamic Selection" to enable the behavior.
+1. Add Dynamic Slicer to the page and drag the column to filter into **Field**.
+2. Drag the column holding the default value into **Dynamic Selection**. Only its first value is used.
+3. In the Format pane, under **Slicer settings > Dynamic selection**, choose the fallback rule.
+4. Save the report with **All** (or your default) selected.
 
 ## How it works
 
-Until the user clicks a value (or "All") in the slicer, it picks its selection in this order:
+Until the user clicks a value, the slicer picks its selection in this order:
 
-1. **Saved or bookmarked selection**, if the user can see it. This is the selection the report was saved with, or the one a bookmark (e.g. a bookmark button) applied. With several values selected, the visible ones are kept and the hidden ones dropped; in single select mode only the first visible one is kept.
-2. **The `Dynamic Selection` value**, if the user can see it. This is always a single value, also in multi-select mode.
-3. **The fallback rule** ("Fallback when default is hidden" in the format pane): first in list, last in list, or smallest / largest. For dates this reads earliest / latest; for text, first / last alphabetically.
+1. **The saved or bookmarked selection**, if the user can see it. With several values selected, the visible ones are kept; in single select, only the first.
+2. **The `Dynamic Selection` value**, if the user can see it.
+3. **The fallback rule**, applied to the values the user can see.
 
-If nothing is in `Dynamic Selection`, the slicer never changes its selection on its own; it behaves like a regular slicer and keeps saved and bookmarked values as they are, even when they are not visible. Use this for slicers driven by bookmark buttons.
+Once the user picks a value themselves, the slicer leaves their choice alone.
 
-Because the saved selection now wins, save the report with "All" (or the value you want as default) selected.
+**Note:** the slicer only knows about the values it receives itself. RLS has to filter the **Field** column, directly or through a relationship that reaches its table. If RLS only filters a fact table, the default stays visible in the slicer and the report can still open empty.
 
-In practice, that means you can create a sorted table that gets filtered by RLS. When access is restricted to the default value, the slicer automatically changes to a visible value according to the fallback rule; then the user is free to modify the slicer.
+## Limitations
 
-**Important:** the fallback only looks at the values the slicer itself receives. RLS (or other filters) must filter the `Field` column, either directly or through a relationship that propagates to its table. If RLS only restricts a fact table and the filter doesn't reach the slicer's dimension, the default value stays visible in the slicer and the report can still show up empty.
-
-## Third-party assets
-
-The clear selection (eraser) icon is the "Eraser" icon from [Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons), Copyright (c) 2020 Microsoft Corporation, used under the MIT License. The full license text is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+- **Dropdown height:** custom visuals are drawn inside a frame the size of the visual, so the open dropdown can't extend over the rest of the report like the built-in one. It fits the space below the box and scrolls. Give the visual extra height, or use the list or tile style.
+- **Number and date format:** values follow the Power BI language (the installed Desktop language, or the display language in the service), not the regional format the built-in visuals use. The visuals API doesn't expose the regional format.
+- **Range styles:** the built-in Between, Before, After and Relative date styles aren't available.
 
 ## Compatibility
 
-This is only tested in Power BI Jan 2026 Desktop, tests in Power BI 2024 and Power BI Report Server 2024 and 2026 are planned.
+Tested in Power BI Desktop and Power BI Report Server (January 2026). Built on Power BI visuals API 5.11.
 
+## Build from source
 
+Requires Node.js 22 or later.
+
+```sh
+npm install
+npm run package     # builds dist/*.pbiviz
+```
+
+The project passes the checks Microsoft runs for [certified Power BI visuals](https://learn.microsoft.com/power-bi/developer/visuals/power-bi-custom-visuals-certified):
+
+```sh
+npm run eslint                              # Power BI recommended lint rules
+npm audit                                   # no moderate or higher vulnerabilities
+npx pbiviz package --certification-audit    # no external requests
+```
+
+Notes for contributors:
+
+- Keep `outDir` in `tsconfig.json`. Without it, `powerbi-visuals-webpack-plugin` runs the build twice and `pbiviz` exits with a webpack `timeEnd` error.
+- `package.json` overrides `qs` and `uuid`, which `powerbi-visuals-tools` pulls in at vulnerable versions through its dev server. Remove the overrides once the tools ship fixed versions.
+- Tool versions are listed in [VERSIONS.md](VERSIONS.md), and changes in [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Matteo Murru.
+
+The eraser icon is from [Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons) (MIT, © Microsoft Corporation); see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

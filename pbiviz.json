@@ -4,7 +4,7 @@
     "displayName": "Dynamic Slicer",
     "guid": "DynamicSlicerE5B9D8D0C4D449A18B87A3C4F55A001",
     "visualClassName": "Visual",
-    "version": "0.2.0.4",
+    "version": "1.0.0.0",
     "description": "Power BI slicer with a dynamic default selection that falls back to a visible value when row-level security hides the default",
     "supportUrl": "https://github.com/Sh4rd4n4/Dynamic_Slicer/issues",
     "gitHubUrl": "https://github.com/Sh4rd4n4/Dynamic_Slicer"

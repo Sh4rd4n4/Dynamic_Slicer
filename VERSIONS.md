@@ -12,6 +12,7 @@ This file lists the tool versions currently used and tested for this repo.
 - `powerbi-visuals-tools` / `pbiviz`: `7.2.1`
 - `powerbi-visuals-api`: `~5.11.1`
 - `powerbi-visuals-utils-formattingmodel`: `^7.1.0`
+- `powerbi-models`: `^2.2.0`
 - `powerbi-visuals-utils-formattingutils`: `^6.1.2` (7.0.0 ships its locale file as an ES module, which the `pbiviz` 7.2.1 localization loader can't read; move to 7.x once the tools support it)
 - `typescript`: `^5.9.3`
 - `eslint`: `^10.13.0` with `eslint-plugin-powerbi-visuals` `^1.1.1`

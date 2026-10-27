@@ -1,16 +1,16 @@
 {
   "name": "dynamic-slicer",
-  "version": "0.2.0.4",
+  "version": "1.0.0.0",
   "private": true,
   "description": "Power BI slicer with a dynamic default selection that falls back to a visible value when row-level security hides the default",
   "scripts": {
     "start": "pbiviz start",
     "package": "pbiviz package",
     "eslint": "npx eslint .",
-    "preview:style": "node tools/style-preview-server.js",
     "validate": "pbiviz package --resources --no-minify"
   },
   "dependencies": {
+    "powerbi-models": "^2.2.0",
     "powerbi-visuals-api": "~5.11.1",
     "powerbi-visuals-utils-formattingmodel": "^7.1.0",
     "powerbi-visuals-utils-formattingutils": "^6.1.2"

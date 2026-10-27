@@ -408,8 +408,5 @@
   },
   "sorting": {
     "default": {}
-  },
-  "drilldown": {
-    "roles": []
   }
 }
