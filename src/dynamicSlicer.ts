@@ -15,6 +15,8 @@ import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 
+import { formattingSettings } from "powerbi-visuals-utils-formattingmodel";
+
 import { VisualFormattingSettingsModel, getFallbackItems } from "./settings";
 import { FallbackStrategy, resolveDynamicSelection, toValueKey } from "./dynamicSelection";
 
@@ -70,6 +72,7 @@ export class Visual implements IVisual {
     private filterTargetKey?: string;
     private preferredSelectionKey?: string;
     private isLoadingMoreData: boolean;
+    private searchText: string;
 
     constructor(options?: VisualConstructorOptions) {
         if (!options) {
@@ -87,6 +90,7 @@ export class Visual implements IVisual {
         this.hasUserInteracted = false;
         this.isDropdownOpen = false;
         this.isLoadingMoreData = false;
+        this.searchText = "";
         this.root = document.createElement("div");
         this.root.className = "dynamic-slicer";
         this.applyHostTheme();
@@ -119,6 +123,8 @@ export class Visual implements IVisual {
             VisualFormattingSettingsModel,
             dataView
         );
+        this.applyLegacySettings(dataView);
+        this.applyThemeDefaults(dataView);
         this.updateFallbackSetting(viewModel);
         this.syncInteractionState(viewModel.fieldColumn, viewModel.dynamicSelectionValues[0]);
         this.requestMoreData(options, dataView);
@@ -154,7 +160,7 @@ export class Visual implements IVisual {
         const control = document.createElement("div");
         control.className = "dynamic-slicer__control";
 
-        if (this.formattingSettings.slicerCard.showHeader.value) {
+        if (this.formattingSettings.headerCard.show.value) {
             const header = document.createElement("div");
             header.className = "dynamic-slicer__header";
             header.textContent = this.getHeaderText();
@@ -166,21 +172,30 @@ export class Visual implements IVisual {
         if (displayMode === "dropdown") {
             control.appendChild(this.createDropdown(renderedItems));
         } else {
+            if (this.isSearchEnabled()) {
+                control.appendChild(this.createSearchBox(control));
+            }
+
             control.appendChild(this.createList(renderedItems, displayMode === "tiles"));
         }
 
-        const clearButton = document.createElement("button");
-        clearButton.className = "dynamic-slicer__clear";
-        clearButton.appendChild(this.createEraserIcon());
-        clearButton.type = "button";
-        clearButton.title = "Clear selections";
-        clearButton.setAttribute("aria-label", "Clear selections");
-        clearButton.disabled = this.selectedValues.length === 0;
-        clearButton.addEventListener("click", () => this.clearFilter(true));
-        this.addTooltip(clearButton, "Clear selections");
-
+        this.filterItems(control);
         this.root.appendChild(control);
-        this.root.appendChild(clearButton);
+        this.fitDropdownList();
+
+        // Single select always keeps one value, so there is nothing to clear.
+        if (!this.isSingleSelect()) {
+            const clearButton = document.createElement("button");
+            clearButton.className = "dynamic-slicer__clear";
+            clearButton.appendChild(this.createEraserIcon());
+            clearButton.type = "button";
+            clearButton.title = "Clear selections";
+            clearButton.setAttribute("aria-label", "Clear selections");
+            clearButton.disabled = this.selectedValues.length === 0;
+            clearButton.addEventListener("click", () => this.clearFilter(true));
+            this.addTooltip(clearButton, "Clear selections");
+            this.root.appendChild(clearButton);
+        }
     }
 
     public getFormattingModel(): powerbi.visuals.FormattingModel {
@@ -203,6 +218,11 @@ export class Visual implements IVisual {
         list.setAttribute("role", "listbox");
         list.setAttribute("aria-label", this.getHeaderText());
         list.setAttribute("aria-multiselectable", String(!this.isSingleSelect()));
+
+        if (this.isSearchEnabled()) {
+            list.appendChild(this.createSearchBox(list));
+        }
+
         this.appendItems(list, items);
 
         const closeDropdown = () => {
@@ -241,6 +261,22 @@ export class Visual implements IVisual {
         this.isDropdownOpen = isOpen;
         selectWrapper.classList.toggle("dynamic-slicer__select-wrapper--open", isOpen);
         toggle.setAttribute("aria-expanded", String(isOpen));
+        this.fitDropdownList();
+    }
+
+    private fitDropdownList(): void {
+        // Custom visuals live in an iframe the size of the visual, so the list can't
+        // overflow onto the report like the official slicer's. Fit it to the space left
+        // below the box instead, so it scrolls rather than being cut off.
+        const list = this.root.querySelector<HTMLElement>(".dynamic-slicer__select-wrapper--open .dynamic-slicer__dropdown-list");
+
+        if (!list) {
+            return;
+        }
+
+        const available = this.root.getBoundingClientRect().bottom - list.getBoundingClientRect().top - 2;
+
+        list.style.maxHeight = `${Math.max(24, Math.min(200, available))}px`;
     }
 
     private createList(items: SlicerItem[], asTiles: boolean): HTMLElement {
@@ -262,11 +298,14 @@ export class Visual implements IVisual {
         }
 
         items.forEach((slicerItem) => {
-            list.appendChild(this.createListButton(
+            const button = this.createListButton(
                 slicerItem.label,
                 slicerItem.selected,
                 (event) => this.onItemClick(slicerItem.value, event)
-            ));
+            );
+
+            button.dataset.searchLabel = slicerItem.label.toLowerCase();
+            list.appendChild(button);
         });
     }
 
@@ -300,6 +339,40 @@ export class Visual implements IVisual {
         } else {
             this.applyFilter(nextValues, true);
         }
+    }
+
+    private createSearchBox(scope: HTMLElement): HTMLElement {
+        const wrapper = document.createElement("div");
+        wrapper.className = "dynamic-slicer__search";
+
+        const input = document.createElement("input");
+        input.className = "dynamic-slicer__search-input";
+        input.type = "search";
+        input.placeholder = "Search";
+        input.setAttribute("aria-label", "Search");
+        input.value = this.searchText;
+        input.addEventListener("input", () => {
+            this.searchText = input.value;
+            this.filterItems(scope);
+        });
+
+        wrapper.appendChild(input);
+
+        return wrapper;
+    }
+
+    private filterItems(scope: HTMLElement): void {
+        // Filters the rendered items in place, so typing doesn't rebuild the visual.
+        // All values are already loaded (see requestMoreData), so no new query is needed.
+        const query = this.isSearchEnabled() ? this.searchText.trim().toLowerCase() : "";
+
+        scope.querySelectorAll<HTMLElement>("[data-search-label]").forEach((item) => {
+            item.hidden = query !== "" && !(item.dataset.searchLabel ?? "").includes(query);
+        });
+    }
+
+    private isSearchEnabled(): boolean {
+        return this.formattingSettings.slicerCard.search.value;
     }
 
     private createListButton(label: string, selected: boolean, onClick: (event: MouseEvent) => void): HTMLButtonElement {
@@ -634,7 +707,7 @@ export class Visual implements IVisual {
     }
 
     private getHeaderText(): string {
-        const customHeader = this.formattingSettings.slicerCard.headerText.value.trim();
+        const customHeader = this.formattingSettings.headerCard.text.value.trim();
 
         return customHeader || this.fieldColumn?.source.displayName || "Field";
     }
@@ -697,6 +770,7 @@ export class Visual implements IVisual {
             this.filterTargetKey = nextTargetKey;
             this.preferredSelectionKey = nextPreferredSelectionKey;
             this.hasUserInteracted = false;
+            this.searchText = "";
         }
     }
 
@@ -767,20 +841,120 @@ export class Visual implements IVisual {
         container.addEventListener("mouseleave", () => setHovered(false));
     }
 
-    private applyHostTheme(): void {
-        const foreground = this.colorPalette.foreground.value;
-        const background = this.colorPalette.background.value;
-        const neutral = this.colorPalette.foregroundNeutralSecondary.value;
-        // The official slicer uses the theme foreground for selection, not a data colour.
-        const selected = this.colorPalette.isHighContrast
-            ? this.colorPalette.foregroundSelected.value
-            : foreground;
+    private applyLegacySettings(dataView?: DataView): void {
+        // Before 0.2.0 the header toggle and text lived in the "slicer" object. Use them
+        // until the new "Slicer header" settings are changed, so older reports keep them.
+        const objects = dataView?.metadata?.objects;
+        const legacy = objects?.slicer;
+        const header = this.formattingSettings.headerCard;
 
-        this.root.classList.toggle("dynamic-slicer--high-contrast", this.colorPalette.isHighContrast);
-        this.root.style.setProperty("--dynamic-slicer-foreground", foreground);
-        this.root.style.setProperty("--dynamic-slicer-background", background);
-        this.root.style.setProperty("--dynamic-slicer-border", neutral);
-        this.root.style.setProperty("--dynamic-slicer-selected", selected);
+        if (legacy?.showTitle !== undefined && objects?.header?.show === undefined) {
+            header.show.value = Boolean(legacy.showTitle);
+        }
+
+        if (typeof legacy?.titleText === "string" && objects?.header?.text === undefined) {
+            header.text.value = legacy.titleText;
+        }
+    }
+
+    private applyThemeDefaults(dataView?: DataView): void {
+        // Colours not set in the format pane follow the report theme, like the official
+        // slicer. The resolved colour is also what the format pane shows.
+        const palette = this.colorPalette;
+        const foreground = palette.foreground.value;
+        const border = palette.foregroundNeutralSecondary.value;
+        const selected = palette.isHighContrast ? palette.foregroundSelected.value : foreground;
+        const objects = dataView?.metadata?.objects;
+        const { headerCard, valuesCard } = this.formattingSettings;
+        const defaults: [formattingSettings.ColorPicker, string, string][] = [
+            [headerCard.fontColor, "header", foreground],
+            [headerCard.borderColor, "header", border],
+            [valuesCard.fontColor, "items", foreground],
+            [valuesCard.selectedColor, "items", selected],
+            [valuesCard.borderColor, "items", border]
+        ];
+
+        defaults.forEach(([slice, objectName, color]) => {
+            if (objects?.[objectName]?.[slice.name] === undefined || !slice.value?.value) {
+                slice.value = { value: color };
+            }
+        });
+    }
+
+    private applyHostTheme(): void {
+        const palette = this.colorPalette;
+        const { headerCard, valuesCard } = this.formattingSettings;
+
+        this.root.classList.toggle("dynamic-slicer--high-contrast", palette.isHighContrast);
+        this.setStyle("--dynamic-slicer-foreground", valuesCard.fontColor.value?.value || palette.foreground.value);
+        this.setStyle("--dynamic-slicer-surface", palette.background.value);
+        this.setStyle("--dynamic-slicer-border", palette.foregroundNeutralSecondary.value);
+        this.setStyle("--dynamic-slicer-selected", valuesCard.selectedColor.value?.value || palette.foreground.value);
+        // The open dropdown list covers other values, so it can't be transparent: it uses
+        // the values background, or the theme background when that is not set.
+        this.setStyle("--dynamic-slicer-dropdown-background", valuesCard.background.value?.value || palette.background.value);
+
+        this.applyTextStyles("header", headerCard);
+        this.setStyle("--dynamic-slicer-header-padding-bottom", `${headerCard.paddingBottom.value}px`);
+        this.applyBorderStyles("header", headerCard);
+
+        this.applyTextStyles("values", valuesCard);
+        this.setStyle("--dynamic-slicer-values-padding-left", `${valuesCard.paddingLeft.value}px`);
+        this.applyBorderStyles("values", valuesCard);
+    }
+
+    private applyTextStyles(
+        prefix: string,
+        card: {
+            font: formattingSettings.FontControl;
+            fontColor: formattingSettings.ColorPicker;
+            background: formattingSettings.ColorPicker;
+        }
+    ): void {
+        const font = card.font;
+
+        this.setStyle(`--dynamic-slicer-${prefix}-font-family`, font.fontFamily.value);
+        this.setStyle(`--dynamic-slicer-${prefix}-font-size`, `${font.fontSize.value}pt`);
+        this.setStyle(`--dynamic-slicer-${prefix}-font-weight`, font.bold?.value ? "700" : "400");
+        this.setStyle(`--dynamic-slicer-${prefix}-font-style`, font.italic?.value ? "italic" : "normal");
+        this.setStyle(`--dynamic-slicer-${prefix}-text-decoration`, font.underline?.value ? "underline" : "none");
+        this.setStyle(`--dynamic-slicer-${prefix}-color`, card.fontColor.value?.value || this.colorPalette.foreground.value);
+        this.setStyle(`--dynamic-slicer-${prefix}-background`, card.background.value?.value || "transparent");
+    }
+
+    private applyBorderStyles(
+        prefix: string,
+        card: {
+            borderPosition: formattingSettings.ItemDropdown;
+            borderColor: formattingSettings.ColorPicker;
+            borderWidth: formattingSettings.NumUpDown;
+        }
+    ): void {
+        const value = card.borderPosition.value;
+        const position = typeof value === "object" ? String(value.value) : String(value);
+        const width = `${Math.max(0, card.borderWidth.value)}px`;
+        const sides: Record<string, string[]> = {
+            none: [],
+            bottom: ["bottom"],
+            top: ["top"],
+            topBottom: ["top", "bottom"],
+            left: ["left"],
+            right: ["right"],
+            frame: ["top", "right", "bottom", "left"]
+        };
+        const activeSides = sides[position] ?? [];
+
+        this.setStyle(
+            `--dynamic-slicer-${prefix}-border-color`,
+            card.borderColor.value?.value || this.colorPalette.foregroundNeutralSecondary.value
+        );
+        ["top", "right", "bottom", "left"].forEach((side) => {
+            this.setStyle(`--dynamic-slicer-${prefix}-border-${side}`, activeSides.includes(side) ? width : "0px");
+        });
+    }
+
+    private setStyle(name: string, value: string): void {
+        this.root.style.setProperty(name, value);
     }
 
     private clearElement(element: HTMLElement): void {

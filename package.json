@@ -1,6 +1,6 @@
 {
   "name": "dynamic-slicer",
-  "version": "0.1.9.0",
+  "version": "0.2.0.2",
   "private": true,
   "description": "Experimental custom visual used to allow dynamic default selection in slicer",
   "scripts": {

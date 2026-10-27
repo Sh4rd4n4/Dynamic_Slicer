@@ -1,37 +1,111 @@
+// Colours, fonts and borders come from the format pane through CSS variables set in
+// Visual.applyHostTheme; the fallbacks below are only used before the first update.
 .dynamic-slicer {
     font-family: "Segoe UI", sans-serif;
     box-sizing: border-box;
-    background: var(--dynamic-slicer-background, #ffffff);
-    color: var(--dynamic-slicer-foreground, #111111);
+    // Transparent like the official slicer, so the visual's own Background setting shows.
+    background: transparent;
+    color: var(--dynamic-slicer-foreground, #252423);
     height: 100%;
     padding: 4px 10px 10px;
     position: relative;
     width: 100%;
 }
 
+// Search hides items with the hidden attribute; item classes set display, so force it.
+.dynamic-slicer [hidden] {
+    display: none !important;
+}
+
 .dynamic-slicer__control {
+    display: flex;
+    flex-direction: column;
     height: 100%;
     padding-right: 18px;
 }
 
 .dynamic-slicer__header {
+    background: var(--dynamic-slicer-header-background, transparent);
+    border-color: var(--dynamic-slicer-header-border-color, #c8c6c4);
+    border-style: solid;
+    border-width:
+        var(--dynamic-slicer-header-border-top, 0)
+        var(--dynamic-slicer-header-border-right, 0)
+        var(--dynamic-slicer-header-border-bottom, 0)
+        var(--dynamic-slicer-header-border-left, 0);
+    box-sizing: border-box;
+    color: var(--dynamic-slicer-header-color, #252423);
     display: block;
-    font-size: 12px;
-    font-weight: 400;
-    line-height: 16px;
-    margin-bottom: 4px;
+    flex: 0 0 auto;
+    font-family: var(--dynamic-slicer-header-font-family, "Segoe UI", sans-serif);
+    font-size: var(--dynamic-slicer-header-font-size, 10pt);
+    font-style: var(--dynamic-slicer-header-font-style, normal);
+    font-weight: var(--dynamic-slicer-header-font-weight, 400);
+    line-height: 1.4;
+    margin-bottom: var(--dynamic-slicer-header-padding-bottom, 4px);
     overflow: hidden;
+    text-decoration: var(--dynamic-slicer-header-text-decoration, none);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
+// Shared text styling for everything showing values: list items, tiles, dropdown box.
+.values-text() {
+    color: var(--dynamic-slicer-values-color, #252423);
+    font-family: var(--dynamic-slicer-values-font-family, "Segoe UI", sans-serif);
+    font-size: var(--dynamic-slicer-values-font-size, 10pt);
+    font-style: var(--dynamic-slicer-values-font-style, normal);
+    font-weight: var(--dynamic-slicer-values-font-weight, 400);
+    text-decoration: var(--dynamic-slicer-values-text-decoration, none);
+}
+
+.values-border() {
+    border-color: var(--dynamic-slicer-values-border-color, #c8c6c4);
+    border-style: solid;
+    border-width:
+        var(--dynamic-slicer-values-border-top, 1px)
+        var(--dynamic-slicer-values-border-right, 1px)
+        var(--dynamic-slicer-values-border-bottom, 1px)
+        var(--dynamic-slicer-values-border-left, 1px);
+}
+
+.dynamic-slicer__search {
+    flex: 0 0 auto;
+    margin-bottom: 4px;
+}
+
+.dynamic-slicer__dropdown-list .dynamic-slicer__search {
+    background: var(--dynamic-slicer-dropdown-background, #ffffff);
+    margin: 0;
+    padding: 4px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.dynamic-slicer__search-input {
+    .values-text();
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--dynamic-slicer-border, #c8c6c4);
+    box-sizing: border-box;
+    outline: none;
+    padding: 2px 4px;
+    width: 100%;
+}
+
+.dynamic-slicer__search-input:focus {
+    border-bottom-color: var(--dynamic-slicer-foreground, #252423);
+}
+
 .dynamic-slicer__select-wrapper {
+    flex: 0 0 auto;
     position: relative;
     margin-top: 2px;
 }
 
 .dynamic-slicer__select-wrapper::after {
-    border-color: var(--dynamic-slicer-border, #666666) transparent transparent;
+    border-color: var(--dynamic-slicer-values-color, #666666) transparent transparent;
     border-style: solid;
     border-width: 4px 4px 0;
     content: "";
@@ -43,25 +117,23 @@
 }
 
 .dynamic-slicer__select {
+    .values-text();
+    .values-border();
     -moz-appearance: none;
     -webkit-appearance: none;
     appearance: none;
-    background: var(--dynamic-slicer-background, #ffffff);
-    border: 1px solid var(--dynamic-slicer-border, #dddddd);
+    background: var(--dynamic-slicer-values-background, transparent);
     border-radius: 0;
     box-sizing: border-box;
-    color: var(--dynamic-slicer-foreground, #555555);
-    display: block;
     cursor: pointer;
-    font-family: "Segoe UI", sans-serif;
-    font-size: 12px;
-    font-weight: 400;
-    height: 24px;
-    line-height: 18px;
+    display: block;
+    line-height: 1.5;
     margin: 0;
+    min-height: 24px;
     min-width: 0;
     outline: none;
-    padding: 2px 24px 2px 6px;
+    overflow: hidden;
+    padding: 2px 24px 2px var(--dynamic-slicer-values-padding-left, 6px);
     position: relative;
     text-align: left;
     text-overflow: ellipsis;
@@ -69,25 +141,22 @@
     width: 100%;
 }
 
-.dynamic-slicer__select:hover {
-    border-color: var(--dynamic-slicer-foreground, #a6a6a6);
-}
-
-.dynamic-slicer__select:focus {
-    border-color: var(--dynamic-slicer-foreground, #666666);
+.dynamic-slicer__select:focus-visible {
+    outline: 1px solid var(--dynamic-slicer-foreground, #252423);
+    outline-offset: -1px;
 }
 
 .dynamic-slicer__dropdown-list {
-    background: var(--dynamic-slicer-background, #ffffff);
-    border: 1px solid var(--dynamic-slicer-border, #dddddd);
+    background: var(--dynamic-slicer-dropdown-background, #ffffff);
+    border: 1px solid var(--dynamic-slicer-border, #c8c6c4);
     box-sizing: border-box;
     display: none;
     left: 0;
-    max-height: 120px;
+    max-height: 200px;
     overflow-y: auto;
     position: absolute;
     right: 0;
-    top: 23px;
+    top: 100%;
     z-index: 2;
 }
 
@@ -107,7 +176,7 @@
     align-items: center;
     background: transparent;
     border: 0;
-    color: var(--dynamic-slicer-foreground, #252423);
+    color: var(--dynamic-slicer-header-color, #252423);
     cursor: pointer;
     display: flex;
     height: 20px;
@@ -133,7 +202,7 @@
 }
 
 .dynamic-slicer__clear:hover:not(:disabled) {
-    background: #f3f2f1;
+    background: rgba(0, 0, 0, 0.06);
 }
 
 /* Like the official slicer, the eraser still shows when nothing is selected; it just does nothing. */
@@ -142,27 +211,26 @@
 }
 
 .dynamic-slicer__list {
-    border: 1px solid var(--dynamic-slicer-border, #eeeeee);
+    .values-border();
+    background: var(--dynamic-slicer-values-background, transparent);
     box-sizing: border-box;
-    max-height: calc(100% - 21px);
+    flex: 1 1 auto;
     min-height: 24px;
     overflow-y: auto;
     width: 100%;
 }
 
 .dynamic-slicer__list-item {
-    background: var(--dynamic-slicer-background, #ffffff);
+    .values-text();
+    background: transparent;
     border: 0;
     box-sizing: border-box;
-    color: var(--dynamic-slicer-foreground, #333333);
     cursor: pointer;
     display: block;
-    font-family: "Segoe UI", sans-serif;
-    font-size: 12px;
-    height: 24px;
-    line-height: 18px;
+    line-height: 1.5;
+    min-height: 24px;
     overflow: hidden;
-    padding: 3px 6px 3px 26px;
+    padding: 3px 6px 3px calc(var(--dynamic-slicer-values-padding-left, 6px) + 20px);
     position: relative;
     text-align: left;
     text-overflow: ellipsis;
@@ -171,46 +239,42 @@
 }
 
 .dynamic-slicer__list-item::before {
-    border: 1px solid var(--dynamic-slicer-border, #8a8886);
+    border: 1px solid var(--dynamic-slicer-values-color, #8a8886);
     box-sizing: border-box;
     content: "";
     height: 14px;
-    left: 6px;
+    left: var(--dynamic-slicer-values-padding-left, 6px);
     position: absolute;
-    top: 5px;
+    top: 50%;
+    transform: translateY(-50%);
     width: 14px;
 }
 
 .dynamic-slicer__list-item:hover {
-    background: #f3f2f1;
-}
-
-.dynamic-slicer__list-item--selected {
-    background: var(--dynamic-slicer-background, #ffffff);
-    color: var(--dynamic-slicer-foreground, #333333);
-    font-weight: 400;
+    background: rgba(0, 0, 0, 0.05);
 }
 
 .dynamic-slicer__list-item--selected::before {
-    background: var(--dynamic-slicer-selected, #333333);
-    border-color: var(--dynamic-slicer-selected, #333333);
+    background: var(--dynamic-slicer-selected, #252423);
+    border-color: var(--dynamic-slicer-selected, #252423);
 }
 
 .dynamic-slicer__list-item--selected::after {
-    border: solid var(--dynamic-slicer-background, #ffffff);
+    border: solid var(--dynamic-slicer-surface, #ffffff);
     border-width: 0 1.5px 1.5px 0;
     box-sizing: border-box;
     content: "";
     height: 9px;
-    left: 11px;
+    left: calc(var(--dynamic-slicer-values-padding-left, 6px) + 5px);
     position: absolute;
-    top: 6px;
-    transform: rotate(45deg);
+    top: 50%;
+    transform: translateY(-65%) rotate(45deg);
     width: 5px;
 }
 
 .dynamic-slicer__list--tiles {
     align-content: flex-start;
+    background: transparent;
     border: 0;
     display: flex;
     flex-wrap: wrap;
@@ -218,7 +282,8 @@
 }
 
 .dynamic-slicer__list--tiles .dynamic-slicer__list-item {
-    border: 1px solid var(--dynamic-slicer-border, #c8c6c4);
+    .values-border();
+    background: var(--dynamic-slicer-values-background, transparent);
     flex: 1 1 80px;
     padding: 3px 8px;
     text-align: center;
@@ -232,9 +297,9 @@
 
 .dynamic-slicer__list--tiles .dynamic-slicer__list-item--selected,
 .dynamic-slicer__list--tiles .dynamic-slicer__list-item--selected:hover {
-    background: var(--dynamic-slicer-selected, #333333);
-    border-color: var(--dynamic-slicer-selected, #333333);
-    color: var(--dynamic-slicer-background, #ffffff);
+    background: var(--dynamic-slicer-selected, #252423);
+    border-color: var(--dynamic-slicer-selected, #252423);
+    color: var(--dynamic-slicer-surface, #ffffff);
 }
 
 .dynamic-slicer--high-contrast .dynamic-slicer__list-item:hover {

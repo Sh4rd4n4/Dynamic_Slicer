@@ -5,7 +5,7 @@
       "name": "field",
       "kind": "Grouping",
       "displayName": "Field"
-    }, 
+    },
     {
       "name": "dynamicSelection",
       "kind": "Grouping",
@@ -62,7 +62,7 @@
       }
     },
     "slicer": {
-      "displayName": "Slicer",
+      "displayName": "Slicer settings",
       "properties": {
         "displayMode": {
           "displayName": "Style",
@@ -84,13 +84,13 @@
           }
         },
         "showTitle": {
-          "displayName": "Show slicer header",
+          "displayName": "Show slicer header (legacy)",
           "type": {
             "bool": true
           }
         },
         "titleText": {
-          "displayName": "Slicer header",
+          "displayName": "Slicer header (legacy)",
           "type": {
             "text": true
           }
@@ -134,6 +134,266 @@
                 "value": "largest"
               }
             ]
+          }
+        },
+        "search": {
+          "displayName": "Search",
+          "type": {
+            "bool": true
+          }
+        }
+      }
+    },
+    "header": {
+      "displayName": "Slicer header",
+      "properties": {
+        "show": {
+          "displayName": "Slicer header",
+          "type": {
+            "bool": true
+          }
+        },
+        "text": {
+          "displayName": "Title text",
+          "type": {
+            "text": true
+          }
+        },
+        "fontFamily": {
+          "displayName": "Font family",
+          "type": {
+            "formatting": {
+              "fontFamily": true
+            }
+          }
+        },
+        "fontSize": {
+          "displayName": "Font size",
+          "type": {
+            "formatting": {
+              "fontSize": true
+            }
+          }
+        },
+        "bold": {
+          "displayName": "Bold",
+          "type": {
+            "bool": true
+          }
+        },
+        "italic": {
+          "displayName": "Italic",
+          "type": {
+            "bool": true
+          }
+        },
+        "underline": {
+          "displayName": "Underline",
+          "type": {
+            "bool": true
+          }
+        },
+        "fontColor": {
+          "displayName": "Font color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "background": {
+          "displayName": "Background",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "borderPosition": {
+          "displayName": "Border position",
+          "type": {
+            "enumeration": [
+              {
+                "displayName": "None",
+                "value": "none"
+              },
+              {
+                "displayName": "Bottom only",
+                "value": "bottom"
+              },
+              {
+                "displayName": "Top only",
+                "value": "top"
+              },
+              {
+                "displayName": "Top and bottom",
+                "value": "topBottom"
+              },
+              {
+                "displayName": "Left only",
+                "value": "left"
+              },
+              {
+                "displayName": "Right only",
+                "value": "right"
+              },
+              {
+                "displayName": "Frame",
+                "value": "frame"
+              }
+            ]
+          }
+        },
+        "borderColor": {
+          "displayName": "Border color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "borderWidth": {
+          "displayName": "Border width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "paddingBottom": {
+          "displayName": "Space below",
+          "type": {
+            "numeric": true
+          }
+        }
+      }
+    },
+    "items": {
+      "displayName": "Values",
+      "properties": {
+        "fontFamily": {
+          "displayName": "Font family",
+          "type": {
+            "formatting": {
+              "fontFamily": true
+            }
+          }
+        },
+        "fontSize": {
+          "displayName": "Font size",
+          "type": {
+            "formatting": {
+              "fontSize": true
+            }
+          }
+        },
+        "bold": {
+          "displayName": "Bold",
+          "type": {
+            "bool": true
+          }
+        },
+        "italic": {
+          "displayName": "Italic",
+          "type": {
+            "bool": true
+          }
+        },
+        "underline": {
+          "displayName": "Underline",
+          "type": {
+            "bool": true
+          }
+        },
+        "fontColor": {
+          "displayName": "Font color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "background": {
+          "displayName": "Background",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "selectedColor": {
+          "displayName": "Selection color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "borderPosition": {
+          "displayName": "Border position",
+          "type": {
+            "enumeration": [
+              {
+                "displayName": "None",
+                "value": "none"
+              },
+              {
+                "displayName": "Bottom only",
+                "value": "bottom"
+              },
+              {
+                "displayName": "Top only",
+                "value": "top"
+              },
+              {
+                "displayName": "Top and bottom",
+                "value": "topBottom"
+              },
+              {
+                "displayName": "Left only",
+                "value": "left"
+              },
+              {
+                "displayName": "Right only",
+                "value": "right"
+              },
+              {
+                "displayName": "Frame",
+                "value": "frame"
+              }
+            ]
+          }
+        },
+        "borderColor": {
+          "displayName": "Border color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "borderWidth": {
+          "displayName": "Border width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "paddingLeft": {
+          "displayName": "Left padding",
+          "type": {
+            "numeric": true
           }
         }
       }

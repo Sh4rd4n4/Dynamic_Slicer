@@ -22,7 +22,10 @@ As of version 1.6.2+, the visual can dynamically adjust its selected value from 
 The visual now supports:
 
 - Dropdown, list and tiles display modes
-- Optional title display and custom title text
+- Format pane laid out like the official slicer: "Slicer settings", "Slicer header" and "Values" cards
+- Header and values formatting: font (family, size, bold, italic, underline), font color, background, border (position, color, width) and spacing; values also have a selection color. Colours not set follow the report theme
+- Optional search box ("Slicer settings" > "Search"), filtering the loaded values as you type
+- Transparent background, so the visual's own "Background" setting applies, as with the official slicer
 - Clear selection with the eraser icon
 - Selection options as in the official slicer: "Single select" (on by default), "Multi-select with CTRL" and "Show "All" option" (the last two only apply when single select is off)
 - Fallback rule: first in list, last in list, or smallest / largest (labelled for the field type: number, date or text); only shown when `Dynamic Selection` is bound
@@ -33,13 +36,13 @@ The visual now supports:
 
 Current limitations:
 
-- Formatting options are still minimal
+- Only the dropdown, list and tile styles; the official range styles (Between, Before, After, Relative date) are not available
+- The dropdown list can't extend past the visual's own box (custom visuals are drawn in an iframe the size of the visual), so it fits the space below the box and scrolls. Give a dropdown slicer extra height, or use the list / tiles style, if the list should show more than a few values
 - Debug output exists in code but is disabled for normal builds
 - All slicer values are loaded up front, in segments of 10,000 rows. Power BI caps this at about 100 MB of data; if it refuses more, the slicer works with the values loaded so far
 
 ## Next steps
 
-- Add more formatting options; this is essential for most use cases
 - Add an option to automatically filter on the current year
 - Test compatibility in Power BI 2024 and Power BI Report Server 2024 / 2026
 
@@ -47,13 +50,11 @@ Current limitations:
 
 In the order they should be tackled:
 
-- [ ] Full parity with the official slicer look and options:
-  - Expose all the official colour / font / border / background / padding formatting options (header, items, selection)
-  - Search box (official: "..." menu > Search); load more values as the list scrolls, and make search run a new query instead of filtering loaded rows
-  - Compare remaining official style modes
+- [ ] Decide whether to add the official range styles (Between, Before, After, Relative date / time) for number and date fields
 
 Done:
 
+- [x] Formatting parity with the official slicer: "Slicer settings" / "Slicer header" / "Values" cards with font, colours, background, borders and spacing; search box; transparent background. Header settings from older reports are carried over
 - [x] Single select / multi-select: "Single select" (default on), "Multi-select with CTRL" and "Show "All" option" in a Selection group, as in the official slicer. Saved / bookmarked multi-selections keep their visible values; the default and the fallback stay single values
 - [x] Saved / bookmarked selections win when visible to the user; otherwise the `Dynamic Selection` default, then the fallback rule. Without a `Dynamic Selection` field the slicer never auto-selects
 - [x] Fallback rule selectable in the format pane, with type-aware smallest / largest options (replaces the "warn on multiple `Dynamic Selection` values" idea)
